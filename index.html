@@ -384,7 +384,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
           <input id="prenom" autocomplete="given-name" placeholder="Lila">
         </div>
         <div class="field">
-          <label for="nom">Nom</label>
+          <label for="nom">Nom (facultatif, jamais affiché)</label>
           <input id="nom" autocomplete="family-name" placeholder="Martin">
         </div>
       </div>
@@ -552,7 +552,6 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
           <div>
             <h2 id="profil-nom"></h2>
             <div class="profil-meta">
-              <span class="badge" id="profil-badge"></span>
               <span class="muted petit" id="profil-discipline"></span>
             </div>
           </div>
@@ -601,7 +600,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
             <input id="pf-prenom" autocomplete="given-name">
           </div>
           <div class="field">
-            <label for="pf-nom">Nom</label>
+            <label for="pf-nom">Nom (facultatif, jamais affiché)</label>
             <input id="pf-nom" autocomplete="family-name">
           </div>
         </div>
@@ -614,7 +613,6 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
           <textarea id="pf-description" maxlength="300" placeholder="Objectifs de la saison, records, ce que tu aimes courir…"></textarea>
           <p class="aide" id="pf-compteur">0 / 300</p>
         </div>
-        <p class="aide" id="pf-role"></p>
         <p class="error" id="erreur-pf" hidden></p>
         <div class="actions">
           <button type="submit" id="bouton-pf">Enregistrer</button>
@@ -779,7 +777,8 @@ function ilYa(iso) {
   if (s < 86400 * 7) return rtf.format(-Math.round(s / 86400), "day");
   return "le " + new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 }
-function nomComplet(p) { return p ? (p.prenom + " " + (p.nom || "")).trim() : "Coach"; }
+// Partout dans l'appli, on n'affiche que le prénom (ni nom de famille, ni rôle)
+function nomComplet(p) { return p && p.prenom ? p.prenom : "Coach"; }
 
 function remplirDisciplines(select) {
   select.replaceChildren(...DISCIPLINES.map((d) => el("option", {}, d)));
@@ -1105,7 +1104,6 @@ async function afficherChoix() {
     const bouton = el("button", { type: "button", class: "tuile" + (p.id === dernier ? " actif" : "") }, [
       avatarEl(p),
       el("span", { class: "tuile-nom" }, nomComplet(p)),
-      el("span", { class: "badge" + (p.role === "Coach" ? " coach" : "") }, p.role),
     ]);
     bouton.addEventListener("click", () => ouvrirProfil(p));
     return el("div", { class: "tuile-wrap" }, bouton);
@@ -1889,8 +1887,6 @@ async function afficherProfil() {
   $("profil-vue").hidden = false;
   $("profil-avatar").replaceChildren(avatarEl(moi, "grand"));
   $("profil-nom").textContent = nomComplet(moi);
-  $("profil-badge").textContent = moi.role;
-  $("profil-badge").className = "badge" + (moi.role === "Coach" ? " coach" : "");
   $("profil-discipline").textContent = moi.discipline || "";
   const desc = $("profil-description");
   desc.textContent = moi.description || "Pas encore de description. Présente-toi en quelques mots !";
@@ -1962,9 +1958,6 @@ $("profil-modifier").addEventListener("click", () => {
   $("pf-discipline").value = moi.discipline || DISCIPLINES[0];
   $("pf-description").value = moi.description || "";
   majCompteur();
-  $("pf-role").textContent = moi.role === "Coach"
-    ? "Ton rôle : Coach."
-    : "Ton rôle : Athlète. Le rôle Coach est attribué par l'administratrice du site.";
   afficherMessage("erreur-pf", "");
   $("profil-vue").hidden = true;
   $("profil-stats").hidden = true;
