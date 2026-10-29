@@ -24,6 +24,8 @@
   /* Couleurs de profil, choisies par chacun */
   --p-rouge: #c0392b; --p-orange: #b9540b; --p-jaune: #9a6a00; --p-vert: #2f7d32; --p-turquoise: #0f766e;
   --p-bleu: #1f63b5; --p-marron: #7a4b2a; --p-violet: #7d3ca8; --p-rose: #b8336a; --p-ardoise: #4b5a68;
+  --p-olive: #5c6b14; --p-cyan: #0b7189;
+  --erreur: #b42318;
   --or: #a87b05; --or-fond: #f6ecd0; --argent: #8a96a3; --bronze: #a0643a; /* médailles */
   --display: "Barlow Condensed", "Arial Narrow", sans-serif;
   --body: "Source Sans 3", system-ui, sans-serif;
@@ -36,6 +38,8 @@
     --moyen: #e2a64a; --dur: #e0664f;
     --p-rouge: #ef7a6a; --p-orange: #f59e5b; --p-jaune: #e8bf4f; --p-vert: #6cc77a; --p-turquoise: #4fc7bb;
     --p-bleu: #74a9ec; --p-marron: #d2a07a; --p-violet: #c08ae6; --p-rose: #f08cb5; --p-ardoise: #a9b7c4;
+    --p-olive: #b7c65e; --p-cyan: #5cc8e6;
+    --erreur: #f97066;
     --or: #e3b341; --or-fond: #3a321c; --argent: #b5c0cb; --bronze: #d08a5a;
     color-scheme: dark;
   }
@@ -72,6 +76,7 @@ body.avec-nav { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); 
   border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--line);
 }
 .couleurs input:checked + label { box-shadow: 0 0 0 3px var(--ink); }
+.couleurs input:disabled + label { cursor: not-allowed; opacity: .35; }
 .couleurs input:checked + label span { display: none; }
 .couleurs input:checked + label::after { content: "✓"; font-size: 18px; }
 .couleurs input:focus-visible + label { outline: 2px solid var(--track); outline-offset: 4px; }
@@ -106,7 +111,7 @@ textarea { min-height: 96px; resize: vertical; line-height: 1.45; }
 textarea.grand { min-height: 150px; }
 input:focus, select:focus, textarea:focus, button:focus-visible, .bouton-fichier:focus-within { outline: 2px solid var(--track); outline-offset: 2px; }
 .aide { font-size: 13px; color: var(--muted); margin: 0; }
-.error { color: var(--track); font-size: 14px; margin: 0; }
+.error { color: var(--erreur); font-size: 14px; margin: 0; }
 .ok { color: var(--ok); font-size: 14px; font-weight: 600; margin: 0; }
 fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-width: 0; }
 legend { padding: 0; margin-bottom: 6px; }
@@ -185,6 +190,7 @@ button.lien {
 .seance { border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 8px; background: var(--surface); min-width: 0; }
 .seance.faite { border-left: 4px solid var(--ok); }
 .seance.post { border-left: 4px solid var(--auteur, var(--line)); }
+.seance.post .seance-date { color: var(--auteur, var(--track)); }
 .seance-date { font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--track); }
 .seance-titre { font-weight: 600; font-size: 18px; margin: 0; overflow-wrap: anywhere; }
 .seance-contenu { white-space: pre-line; margin: 0; overflow-wrap: anywhere; }
@@ -400,7 +406,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
       <fieldset>
         <legend class="label">Ta couleur</legend>
         <div class="couleurs" id="couleurs-creation"></div>
-        <p class="aide">Elle te rend reconnaissable partout dans l'appli. Les couleurs déjà prises montrent l'initiale de la personne.</p>
+        <p class="aide">Toute l'appli prendra cette couleur, et les autres te reconnaîtront grâce à elle. Les couleurs grisées sont déjà prises (on voit l'initiale de la personne).</p>
       </fieldset>
       <p class="aide">Tu pourras ajouter une photo et une description ensuite, dans l'onglet Profil.</p>
       <p class="error" id="erreur-creation" hidden></p>
@@ -807,6 +813,7 @@ function messageErreur(e) {
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Impossible de joindre le serveur. Vérifie ta connexion Internet.";
   if (/row-level security|permission denied|Unauthorized/i.test(m)) return "Action refusée par les règles de la base de données.";
   if (/column .* does not exist|Could not find/i.test(m)) return "La base de données n'est pas à jour : lance le dernier code SQL dans Supabase.";
+  if (/duplicate key|profils_couleur_unique/i.test(m)) return "Cette couleur vient d'être prise par quelqu'un d'autre. Choisis-en une autre.";
   if (/Bucket not found/i.test(m)) return "Le dossier des photos n'existe pas encore : lance le dernier code SQL dans Supabase.";
   return "Une erreur est survenue : " + m;
 }
@@ -821,37 +828,69 @@ async function pendant(bouton, texteAttente, action) {
 
 // Couleurs de profil : chacun choisit la sienne
 const COULEURS = {
-  rouge: "Rouge", orange: "Orange", jaune: "Jaune", vert: "Vert", turquoise: "Turquoise",
-  bleu: "Bleu", marron: "Marron", violet: "Violet", rose: "Rose", ardoise: "Gris ardoise",
+  rouge: "Rouge", orange: "Orange", jaune: "Jaune", olive: "Olive", vert: "Vert", turquoise: "Turquoise",
+  cyan: "Cyan", bleu: "Bleu", violet: "Violet", rose: "Rose", marron: "Marron", ardoise: "Gris ardoise",
 };
-// La couleur choisie, ou une couleur attribuée d'office aux anciens profils
+let profilsConnus = [];
+
+// Les profils qui n'ont pas encore choisi reçoivent une couleur libre, toujours la même
+function attribuerCouleurs(profils) {
+  const prises = new Set(profils.filter((p) => COULEURS[p.couleur]).map((p) => p.couleur));
+  const libres = Object.keys(COULEURS).filter((c) => !prises.has(c));
+  profils.filter((p) => !COULEURS[p.couleur])
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)))
+    .forEach((p, i) => { p.couleurAuto = libres.length ? libres[i % libres.length] : null; });
+}
+
+// La couleur d'une personne : celle qu'elle a choisie, sinon celle attribuée d'office
 function cleCouleur(p) {
-  if (p && COULEURS[p.couleur]) return p.couleur;
+  if (!p) return "ardoise";
+  if (COULEURS[p.couleur]) return p.couleur;
+  if (p.couleurAuto) return p.couleurAuto;
+  const connu = profilsConnus.find((x) => x.id === p.id);
+  if (connu && (COULEURS[connu.couleur] || connu.couleurAuto)) return COULEURS[connu.couleur] ? connu.couleur : connu.couleurAuto;
   let n = 0;
-  for (const c of String((p && p.id) || "x")) n = (n * 31 + c.charCodeAt(0)) % 997;
+  for (const c of String(p.id || "x")) n = (n * 31 + c.charCodeAt(0)) % 997;
   const cles = Object.keys(COULEURS);
   return cles[n % cles.length];
 }
 function couleurDe(p) { return "var(--p-" + cleCouleur(p) + ")"; }
 
-// Pastilles de couleur à choisir (les couleurs déjà prises affichent l'initiale de la personne)
-let profilsConnus = [];
+// Met à jour la liste locale des profils après une création ou une modification
+function memoriserProfil(profil) {
+  const i = profilsConnus.findIndex((p) => p.id === profil.id);
+  if (i >= 0) profilsConnus[i] = profil; else profilsConnus.push(profil);
+  attribuerCouleurs(profilsConnus);
+}
+
+// Toute l'interface prend la couleur de la personne connectée
+function appliquerCouleur(p) {
+  const racine = document.documentElement.style;
+  if (p) racine.setProperty("--track", couleurDe(p));
+  else racine.removeProperty("--track");
+}
+
+// Pastilles de couleur : celles des autres sont grisées et ne peuvent pas être choisies
 function choixCouleur(conteneur, nomGroupe, valeur, sansCeProfil) {
   const prises = {};
   profilsConnus.filter((p) => p.id !== sansCeProfil).forEach((p) => {
     (prises[cleCouleur(p)] ||= []).push(p.prenom.charAt(0).toUpperCase());
   });
-  if (!valeur) valeur = Object.keys(COULEURS).find((c) => !prises[c]) || "rouge";
+  const libres = Object.keys(COULEURS).filter((c) => !prises[c]);
+  if (!valeur || prises[valeur]) valeur = libres[0] || null;
   conteneur.replaceChildren(...Object.entries(COULEURS).flatMap(([cle, nom]) => {
     const id = nomGroupe + "-" + cle;
+    const prise = !!prises[cle];
     const input = el("input", { type: "radio", name: nomGroupe, id, value: cle });
+    if (prise) input.disabled = true;
     if (cle === valeur) input.checked = true;
-    const qui = prises[cle] ? prises[cle].slice(0, 2).join("") : "";
-    const label = el("label", { for: id, title: nom + (qui ? " (déjà prise)" : ""), "aria-label": nom + (qui ? ", déjà prise" : "") }, el("span", {}, qui));
+    const qui = prise ? prises[cle].slice(0, 2).join("") : "";
+    const label = el("label", { for: id, title: nom + (prise ? " (déjà prise)" : ""), "aria-label": nom + (prise ? ", déjà prise" : "") }, el("span", {}, qui));
     label.style.setProperty("--c", "var(--p-" + cle + ")");
     return [input, label];
   }));
-  return () => { const c = conteneur.querySelector("input:checked"); return c ? c.value : valeur; };
+  if (!libres.length) conteneur.append(el("p", { class: "aide" }, "Toutes les couleurs sont déjà prises : une couleur te sera attribuée automatiquement."));
+  return () => { const c = conteneur.querySelector("input:checked"); return c ? c.value : null; };
 }
 function avatarEl(p, taille = "", photoForcee = null) {
   const a = el("span", { class: "avatar " + taille, "aria-hidden": "true" });
@@ -1088,6 +1127,7 @@ function ongletsDe(p) {
 
 function majEntete() {
   $("session").hidden = !moi;
+  appliquerCouleur(moi);
   if (!moi) return;
   $("session-avatar").replaceChildren(avatarEl(moi, "petit"));
   $("session-nom").textContent = moi.prenom;
@@ -1139,6 +1179,7 @@ async function afficherChoix() {
   let profils;
   try { profils = await donnees.tousLesProfils(); }
   catch (e) { return chargement(messageErreur(e), afficherChoix); }
+  attribuerCouleurs(profils);
   profilsConnus = profils;
 
   const dernier = lire("couloir-dernier");
@@ -1176,6 +1217,7 @@ $("form-creation").addEventListener("submit", async (event) => {
   if (!champs.prenom) return afficherMessage("erreur-creation", "Indique ton prénom.");
   try {
     const profil = await pendant($("bouton-creation"), "Création…", () => donnees.creerProfil(champs));
+    memoriserProfil(profil);
     ouvrirProfil(profil);
   } catch (e) {
     afficherMessage("erreur-creation", messageErreur(e));
@@ -2049,6 +2091,7 @@ $("profil-form").addEventListener("submit", async (event) => {
       await donnees.modifierProfil(moi.id, champs);
       moi = (await donnees.profil(moi.id)) || { ...moi, ...champs };
     });
+    memoriserProfil(moi);
     photoEnAttente = null;
     majEntete();
     afficherProfil();
