@@ -235,6 +235,46 @@ button.cocher:hover .case { background: var(--ok); }
 .photo-ligne { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .photo-ligne > div { display: grid; gap: 6px; }
 
+/* Modèles de séance (coach) */
+.types { display: flex; flex-wrap: wrap; gap: 8px; }
+.types input { position: absolute; opacity: 0; pointer-events: none; }
+.types label {
+  text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 99px; padding: 6px 14px; cursor: pointer;
+}
+.types input:checked + label { background: var(--coach); border-color: var(--coach); color: var(--surface); }
+.types input:focus-visible + label { outline: 2px solid var(--track); outline-offset: 2px; }
+.champs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; align-items: end; }
+.avec-unite { display: flex; align-items: center; gap: 8px; }
+.avec-unite input { flex: 1; min-width: 0; }
+.avec-unite span { color: var(--muted); font-size: 14px; }
+.option {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 400; color: var(--ink);
+}
+.option input { width: 18px; height: 18px; accent-color: var(--coach); }
+.groupe-libre { display: grid; gap: 16px; }
+.apercu { border: 1px dashed var(--coach); border-radius: 8px; padding: 12px 14px; display: grid; gap: 4px; background: var(--bg); min-width: 0; }
+.seance-haut { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.type-chip {
+  font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--coach); border: 1px solid var(--coach); border-radius: 4px; padding: 0 6px;
+}
+.consignes { border-left: 3px solid var(--coach); padding: 2px 0 2px 12px; display: grid; gap: 2px; }
+.consignes p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+
+/* Commentaires sous les posts du fil */
+.commentaires { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.com-liste { display: grid; gap: 10px; }
+.com-liste:empty { display: none; }
+.com { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.com-corps { min-width: 0; display: grid; gap: 1px; }
+.com-texte { margin: 0; font-size: 15px; white-space: pre-line; overflow-wrap: anywhere; }
+.com-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 13px; color: var(--muted); }
+.com-form { display: flex; gap: 8px; }
+.com-form input { flex: 1; min-width: 0; padding: 8px 12px; }
+.com-form button { padding: 8px 14px; }
+
 /* Message d'accueil du coach */
 .hello { font-family: var(--display); font-weight: 700; font-size: 40px; line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: .02em; overflow-wrap: anywhere; }
 .hello em { font-style: normal; color: var(--coach); }
@@ -368,23 +408,50 @@ button.cocher:hover .case { background: var(--ok); }
         <p class="vide" id="coach-aucun" hidden>Aucun athlète inscrit pour l'instant. Dès qu'un athlète aura ajouté son profil, il apparaîtra ici.</p>
 
         <form id="form-seance" novalidate>
-          <div class="field">
-            <label for="choix-athlete">Athlète</label>
-            <select id="choix-athlete"></select>
-          </div>
           <div class="row">
+            <div class="field">
+              <label for="choix-athlete">Athlète</label>
+              <select id="choix-athlete"></select>
+            </div>
             <div class="field">
               <label for="seance-date">Date</label>
               <input id="seance-date" type="date">
             </div>
+          </div>
+
+          <fieldset>
+            <legend class="label">Type de séance</legend>
+            <div class="types" id="types"></div>
+          </fieldset>
+
+          <!-- Champs propres au type choisi (durée, répétitions…) -->
+          <div class="champs" id="champs-modele"></div>
+          <label class="option" id="option-echauffement">
+            <input type="checkbox" id="echauffement" checked>
+            Ajouter l'échauffement et le retour au calme
+          </label>
+
+          <!-- Pour une séance libre : titre et contenu écrits à la main -->
+          <div class="groupe-libre" id="champs-libre" hidden>
             <div class="field">
               <label for="seance-titre">Titre</label>
-              <input id="seance-titre" placeholder="Fractionné 400 m">
+              <input id="seance-titre" placeholder="Séance technique de haies">
+            </div>
+            <div class="field">
+              <label for="seance-contenu">Contenu de la séance</label>
+              <textarea id="seance-contenu" class="grand" placeholder="Échauffement : 20 min footing + gammes&#10;Corps de séance : …&#10;Retour au calme : 10 min footing + étirements"></textarea>
             </div>
           </div>
+
+          <div class="apercu" id="apercu">
+            <span class="label">Aperçu pour l'athlète</span>
+            <p class="seance-titre" id="apercu-titre"></p>
+            <p class="seance-contenu" id="apercu-contenu"></p>
+          </div>
+
           <div class="field">
-            <label for="seance-contenu">Contenu de la séance</label>
-            <textarea id="seance-contenu" class="grand" placeholder="Échauffement : 20 min footing + gammes&#10;Corps de séance : 2 × (5 × 400 m), r = 1 min, R = 4 min&#10;Retour au calme : 10 min footing + étirements"></textarea>
+            <label for="seance-consignes">Consignes ou commentaire (facultatif)</label>
+            <textarea id="seance-consignes" placeholder="Allure 10 km, reste relâché sur les dernières répétitions…"></textarea>
           </div>
           <p class="error" id="erreur-seance" hidden></p>
           <p class="ok" id="ok-seance" hidden></p>
@@ -494,8 +561,11 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
 function verifier({ data, error }) { if (error) throw error; return data; }
 
 const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url";
-const CHAMPS_SEANCE = "id, date, titre, contenu, fait, fait_le, ressenti, commentaire, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
-const CHAMPS_FIL = CHAMPS_SEANCE + ", athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url)";
+const CHAMPS_SEANCE = "id, date, type, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
+const CHAMPS_COMMENTAIRE = "id, texte, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url)";
+const CHAMPS_FIL = CHAMPS_SEANCE
+  + ", athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url)"
+  + ", commentaires(" + CHAMPS_COMMENTAIRE + ")";
 
 const donnees = {
   // Profils
@@ -547,6 +617,14 @@ const donnees = {
   async envoyerSeance(s) { verifier(await sb.from("seances").insert(s)); },
   async majSeance(id, champs) { verifier(await sb.from("seances").update(champs).eq("id", id)); },
   async supprimerSeance(id) { verifier(await sb.from("seances").delete().eq("id", id)); },
+
+  // Commentaires
+  async commenter(seanceId, auteurId, texte) {
+    return verifier(await sb.from("commentaires")
+      .insert({ seance_id: seanceId, auteur_id: auteurId, texte })
+      .select(CHAMPS_COMMENTAIRE).single());
+  },
+  async supprimerCommentaire(id) { verifier(await sb.from("commentaires").delete().eq("id", id)); },
 };
 
 /* =========================================================
@@ -643,6 +721,96 @@ function choixRessenti(prefixe, valeur) {
   fs.append(ligne, el("p", { class: "aide" }, "1 = très facile · 10 = effort maximal"));
   fs.valeur = () => { const c = fs.querySelector("input:checked"); return c ? Number(c.value) : null; };
   return fs;
+}
+
+/* ---------- Modèles de séance pour le coach ---------- */
+// « 75 » devient « 1 h 15 », « 45 » devient « 45 min »
+function enMinutes(min) {
+  if (min < 60) return min + " min";
+  const h = Math.floor(min / 60), m = min % 60;
+  return h + " h" + (m ? " " + String(m).padStart(2, "0") : "");
+}
+// « 90 » devient « 1 min 30 », « 45 » devient « 45 s »
+function enSecondes(s) {
+  if (s < 60) return s + " s";
+  const m = Math.floor(s / 60), r = s % 60;
+  return m + " min" + (r ? " " + String(r).padStart(2, "0") : "");
+}
+const ECHAUFFEMENT = "Échauffement : 20 min de footing + gammes";
+const ECHAUFFEMENT_VITESSE = "Échauffement : 20 min de footing + gammes + 3 accélérations progressives";
+const RETOUR_AU_CALME = "Retour au calme : 10 min de footing + étirements";
+
+// Chaque modèle : ses champs, puis comment fabriquer le titre et le contenu
+const MODELES = {
+  footing: {
+    nom: "Footing",
+    champs: [{ id: "duree", label: "Durée", unite: "min", defaut: 45 }],
+    titre: (v) => "Footing " + enMinutes(v.duree),
+    corps: (v) => enMinutes(v.duree) + " en endurance fondamentale (aisance respiratoire, tu peux parler)",
+  },
+  sortie_longue: {
+    nom: "Sortie longue",
+    champs: [{ id: "duree", label: "Durée", unite: "min", defaut: 75 }],
+    titre: (v) => "Sortie longue " + enMinutes(v.duree),
+    corps: (v) => enMinutes(v.duree) + " à allure régulière et confortable",
+  },
+  fractionne: {
+    nom: "Fractionné",
+    echauffement: ECHAUFFEMENT,
+    champs: [
+      { id: "series", label: "Nombre de séries", defaut: 2 },
+      { id: "reps", label: "Répétitions par série", defaut: 5 },
+      { id: "distance", label: "Distance", unite: "m", defaut: 400 },
+      { id: "recup", label: "Récup entre répétitions", unite: "s", defaut: 60 },
+      { id: "recupSerie", label: "Récup entre séries", unite: "min", defaut: 3 },
+    ],
+    titre: (v) => "Fractionné " + blocFractionne(v),
+    corps: (v) => blocFractionne(v) + ", r = " + enSecondes(v.recup) + (v.series > 1 ? ", R = " + enMinutes(v.recupSerie) : ""),
+  },
+  cotes: {
+    nom: "Côtes",
+    echauffement: ECHAUFFEMENT,
+    champs: [
+      { id: "reps", label: "Nombre de côtes", defaut: 8 },
+      { id: "duree", label: "Durée de chaque côte", unite: "s", defaut: 30 },
+    ],
+    titre: (v) => "Côtes " + v.reps + " × " + enSecondes(v.duree),
+    corps: (v) => v.reps + " × " + enSecondes(v.duree) + " en côte, récupération en redescendant en trottinant",
+  },
+  vitesse: {
+    nom: "Vitesse",
+    echauffement: ECHAUFFEMENT_VITESSE,
+    champs: [
+      { id: "reps", label: "Répétitions", defaut: 6 },
+      { id: "distance", label: "Distance", unite: "m", defaut: 60 },
+      { id: "recup", label: "Récupération", unite: "min", defaut: 3 },
+    ],
+    titre: (v) => "Vitesse " + v.reps + " × " + v.distance + " m",
+    corps: (v) => v.reps + " × " + v.distance + " m à vitesse maximale, récupération " + enMinutes(v.recup) + " en marchant",
+  },
+  renfo: {
+    nom: "Renforcement",
+    champs: [{ id: "duree", label: "Durée", unite: "min", defaut: 30 }],
+    titre: (v) => "Renforcement " + enMinutes(v.duree),
+    corps: (v) => enMinutes(v.duree) + " de renforcement musculaire : gainage, squats, fentes, pompes",
+  },
+  libre: { nom: "Séance libre", libre: true },
+};
+function blocFractionne(v) {
+  const base = v.reps + " × " + v.distance + " m";
+  return v.series > 1 ? v.series + " × (" + base + ")" : base;
+}
+
+// En-tête d'une carte : date + type de séance
+function enTeteSeance(s) {
+  return el("div", { class: "seance-haut" }, [
+    el("span", { class: "seance-date" }, formatDate(s.date)),
+    s.type && MODELES[s.type] && s.type !== "libre" ? el("span", { class: "type-chip" }, MODELES[s.type].nom) : null,
+  ]);
+}
+function blocConsignes(s) {
+  if (!s.consignes) return null;
+  return el("div", { class: "consignes" }, [el("span", { class: "label" }, "Consignes du coach"), el("p", {}, s.consignes)]);
 }
 
 // Réduit une photo en carré de 320 px (plus légère à envoyer et à afficher)
@@ -809,7 +977,7 @@ function carteFil(s) {
         el("div", { class: "muted petit" }, quoi + " · " + ilYa(s.fait_le)),
       ]),
     ]),
-    s.date ? el("span", { class: "seance-date" }, formatDate(s.date)) : null,
+    s.date ? enTeteSeance(s) : null,
     s.titre ? el("p", { class: "seance-titre" }, s.titre) : null,
     s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : null,
     s.ressenti ? el("div", { class: "etat" }, badgeRessenti(s.ressenti)) : null,
@@ -824,7 +992,70 @@ function carteFil(s) {
     });
     carte.append(b);
   }
+  carte.append(zoneCommentaires(s));
   return carte;
+}
+
+// Commentaires sous un post : les 2 derniers, puis « Voir les N commentaires »
+function zoneCommentaires(s) {
+  const coms = (s.commentaires || []).slice().sort((a, b) => a.cree_le.localeCompare(b.cree_le));
+  let toutVoir = false;
+  const liste = el("div", { class: "com-liste" });
+
+  function ligne(c) {
+    const meta = el("div", { class: "com-meta" }, el("span", {}, ilYa(c.cree_le)));
+    if (moi && c.auteur_id === moi.id) {
+      const sup = el("button", { type: "button", class: "lien petit" }, "Supprimer");
+      sup.addEventListener("click", async () => {
+        try {
+          await pendant(sup, "…", () => donnees.supprimerCommentaire(c.id));
+          coms.splice(coms.indexOf(c), 1);
+          rendre();
+        } catch (e) { meta.append(el("span", { class: "error" }, messageErreur(e))); }
+      });
+      meta.append(sup);
+    }
+    return el("div", { class: "com" }, [
+      avatarEl(c.auteur, "mini"),
+      el("div", { class: "com-corps" }, [
+        el("p", { class: "com-texte" }, [el("b", {}, nomComplet(c.auteur)), " ", c.texte]),
+        meta,
+      ]),
+    ]);
+  }
+
+  function rendre() {
+    liste.replaceChildren();
+    if (!toutVoir && coms.length > 2) {
+      const voir = el("button", { type: "button", class: "lien petit", style: "justify-self:start" }, "Voir les " + coms.length + " commentaires");
+      voir.addEventListener("click", () => { toutVoir = true; rendre(); });
+      liste.append(voir);
+    }
+    (toutVoir ? coms : coms.slice(-2)).forEach((c) => liste.append(ligne(c)));
+  }
+
+  const champ = el("input", { type: "text", id: "com-input-" + s.id, maxlength: "500", placeholder: "Ajouter un commentaire…", "aria-label": "Ajouter un commentaire", autocomplete: "off" });
+  const envoyer = el("button", { type: "submit" }, "Envoyer");
+  const erreur = el("p", { class: "error", hidden: "" });
+  const form = el("form", { class: "com-form", novalidate: "" }, [champ, envoyer]);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const texte = champ.value.trim();
+    if (!texte || !moi) return;
+    erreur.hidden = true;
+    try {
+      const c = await pendant(envoyer, "…", () => donnees.commenter(s.id, moi.id, texte));
+      coms.push(c);
+      champ.value = "";
+      rendre();
+    } catch (e) {
+      erreur.textContent = messageErreur(e);
+      erreur.hidden = false;
+    }
+  });
+
+  rendre();
+  return el("div", { class: "commentaires" }, [liste, form, erreur]);
 }
 
 async function chargerFil(depuisLeDebut) {
@@ -940,9 +1171,10 @@ function carteSemaine(s) {
   const carte = el("article", { class: "seance" });
   const zone = el("div", { class: "ressenti-zone" });
   carte.append(
-    el("span", { class: "seance-date" }, formatDate(s.date)),
+    enTeteSeance(s),
     s.titre ? el("p", { class: "seance-titre" }, s.titre) : "",
     s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : "",
+    blocConsignes(s) || "",
     el("p", { class: "muted petit" }, "Proposée par " + nomComplet(s.coach)),
     zone,
   );
@@ -1046,9 +1278,10 @@ async function afficherPlanifier() {
 
 function carteCoach(s) {
   const carte = el("article", { class: "seance" + (s.fait ? " faite" : "") }, [
-    el("span", { class: "seance-date" }, formatDate(s.date)),
+    enTeteSeance(s),
     s.titre ? el("p", { class: "seance-titre" }, s.titre) : null,
     s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : null,
+    blocConsignes(s),
     el("div", { class: "etat" }, s.fait
       ? [el("span", { class: "pill faite" }, "✓ Faite"), s.ressenti ? badgeRessenti(s.ressenti) : null]
       : [el("span", { class: "pill" }, "À faire")]),
@@ -1086,21 +1319,78 @@ $("form-seance").addEventListener("submit", async (event) => {
   afficherMessage("ok-seance", "");
   afficherMessage("erreur-seance", "");
   const athlete = athletes.find((a) => a.id === choixAthlete.value);
-  const titre = $("seance-titre").value.trim();
-  const contenu = $("seance-contenu").value.trim();
+  const { titre, contenu } = seanceDuModele();
   const date = $("seance-date").value || null;
+  const consignes = $("seance-consignes").value.trim() || null;
   if (!titre && !contenu) return afficherMessage("erreur-seance", "Donne au moins un titre ou un contenu à la séance.");
   try {
-    await pendant($("bouton-seance"), "Envoi…", () =>
-      donnees.envoyerSeance({ athlete_id: athlete.id, coach_id: moi.id, date, titre: titre || null, contenu: contenu || null }));
-    $("seance-titre").value = "";
-    $("seance-contenu").value = "";
-    afficherMessage("ok-seance", "Séance envoyée à " + athlete.prenom + ".");
+    await pendant($("bouton-seance"), "Envoi…", () => donnees.envoyerSeance({
+      athlete_id: athlete.id, coach_id: moi.id, date, type: typeChoisi,
+      titre: titre || null, contenu: contenu || null, consignes,
+    }));
+    // Le formulaire reste rempli : on peut envoyer la même séance à un autre athlète
+    afficherMessage("ok-seance", "Séance envoyée à " + athlete.prenom + ". Pour envoyer la même à quelqu'un d'autre, change d'athlète et clique à nouveau sur « Envoyer ».");
     afficherSeancesCoach();
   } catch (e) {
     afficherMessage("erreur-seance", messageErreur(e));
   }
 });
+
+/* ---------- Choix du type de séance et champs préremplis ---------- */
+let typeChoisi = MODELES[lire("couloir-type")] ? lire("couloir-type") : "footing";
+const valeursSaisies = {}; // gardées quand on change de type puis qu'on revient
+
+function construireTypes() {
+  $("types").replaceChildren(...Object.entries(MODELES).flatMap(([cle, m]) => {
+    const input = el("input", { type: "radio", name: "type-seance", id: "type-" + cle, value: cle });
+    if (cle === typeChoisi) input.checked = true;
+    input.addEventListener("change", () => { typeChoisi = cle; ecrire("couloir-type", cle); construireChamps(); });
+    return [input, el("label", { for: "type-" + cle }, m.nom)];
+  }));
+  construireChamps();
+}
+
+function construireChamps() {
+  const m = MODELES[typeChoisi];
+  $("champs-libre").hidden = !m.libre;
+  $("option-echauffement").hidden = !m.echauffement;
+  $("apercu").hidden = !!m.libre;
+  $("champs-modele").hidden = !!m.libre;
+  $("champs-modele").replaceChildren(...(m.champs || []).map((c) => {
+    const id = "mod-" + typeChoisi + "-" + c.id;
+    const input = el("input", { type: "number", id, min: "1", step: "1", inputmode: "numeric" });
+    input.value = valeursSaisies[id] ?? c.defaut;
+    input.addEventListener("input", () => { valeursSaisies[id] = input.value; majApercu(); });
+    return el("div", { class: "field" }, [
+      el("label", { for: id }, c.label),
+      el("div", { class: "avec-unite" }, [input, c.unite ? el("span", {}, c.unite) : null]),
+    ]);
+  }));
+  majApercu();
+}
+
+// Fabrique le titre et le contenu à partir du modèle et des champs remplis
+function seanceDuModele() {
+  const m = MODELES[typeChoisi];
+  if (m.libre) return { titre: $("seance-titre").value.trim(), contenu: $("seance-contenu").value.trim() };
+  const v = {};
+  m.champs.forEach((c) => {
+    const n = parseInt($("mod-" + typeChoisi + "-" + c.id).value, 10);
+    v[c.id] = n > 0 ? n : c.defaut;
+  });
+  const lignes = [m.corps(v)];
+  if (m.echauffement && $("echauffement").checked) { lignes.unshift(m.echauffement); lignes.push(RETOUR_AU_CALME); }
+  return { titre: m.titre(v), contenu: lignes.join("\n") };
+}
+
+function majApercu() {
+  if (MODELES[typeChoisi].libre) return;
+  const { titre, contenu } = seanceDuModele();
+  $("apercu-titre").textContent = titre;
+  $("apercu-contenu").textContent = contenu;
+}
+$("echauffement").addEventListener("change", majApercu);
+construireTypes();
 
 /* =========================================================
    9. ONGLET PROFIL : photo, description, statistiques
