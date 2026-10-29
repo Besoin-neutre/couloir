@@ -18,6 +18,7 @@
   --track-ink: #ffffff;
   --coach: #2f5d8a;       /* bleu pour repérer les coachs */
   --ok: #2d7a4b;          /* vert de confirmation */
+  --av1: #b8432f; --av2: #2f5d8a; --av3: #2d7a4b; --av4: #8a5a2f; --av5: #6b4f8f; /* couleurs des avatars */
   --display: "Barlow Condensed", "Arial Narrow", sans-serif;
   --body: "Source Sans 3", system-ui, sans-serif;
   color-scheme: light;
@@ -26,6 +27,7 @@
   :root {
     --bg: #11171d; --surface: #1a232c; --ink: #e8edf1; --muted: #9aa8b4;
     --line: #2d3a46; --track: #e0664f; --track-ink: #11171d; --coach: #7fb0de; --ok: #6cc28e;
+    --av1: #e0664f; --av2: #7fb0de; --av3: #6cc28e; --av4: #d9a066; --av5: #b39ddb;
     color-scheme: dark;
   }
 }
@@ -116,6 +118,32 @@ button.lien {
 }
 .badge.coach { border-color: var(--coach); color: var(--coach); }
 
+/* Choix du profil, façon Netflix */
+.grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 18px 12px; }
+.tuile-wrap { position: relative; min-width: 0; }
+.tuile {
+  width: 100%; display: grid; justify-items: center; gap: 8px; padding: 6px;
+  background: transparent; border: 0; color: var(--ink); font-weight: 400;
+}
+.avatar {
+  width: 84px; height: 84px; border-radius: 14px; display: grid; place-items: center;
+  font-family: var(--display); font-weight: 700; font-size: 42px; text-transform: uppercase;
+  background: var(--av, var(--track)); color: var(--surface);
+  border: 3px solid transparent; transition: border-color .15s, transform .15s;
+}
+.tuile:hover .avatar, .tuile:focus-visible .avatar { border-color: var(--ink); }
+@media (prefers-reduced-motion: no-preference) { .tuile:hover .avatar { transform: scale(1.05); } }
+.tuile.actif .avatar { border-color: var(--ink); }
+.tuile.ajout .avatar { background: transparent; border: 2px dashed var(--line); color: var(--muted); }
+.tuile-nom { font-weight: 600; text-align: center; overflow-wrap: anywhere; line-height: 1.2; }
+.tuile .badge { font-size: 11px; }
+.retirer {
+  position: absolute; top: 0; right: 4px; width: 30px; height: 30px; padding: 0;
+  border-radius: 50%; background: var(--surface); color: var(--ink); border: 1px solid var(--line);
+  font-size: 18px; line-height: 1;
+}
+.grille:not(.gestion) .retirer { display: none; }
+
 /* Écrans d'accueil */
 .hello { font-family: var(--display); font-weight: 700; font-size: 44px; line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: .02em; overflow-wrap: anywhere; }
 .hello em { font-style: normal; color: var(--track); }
@@ -151,17 +179,28 @@ dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
     </div>
     <div class="session" id="session" hidden>
       <span id="session-nom"></span>
-      <button class="lien" type="button" id="deconnexion">Se déconnecter</button>
+      <button class="lien" type="button" id="changer-profil">Changer de profil</button>
     </div>
   </div>
 
   <!-- ÉCRAN 0 : chargement / erreur générale -->
   <section class="card" id="ecran-chargement">
     <p class="muted" id="message-chargement">Chargement…</p>
+    <button type="button" class="ghost" id="retour-erreur" style="justify-self:start" hidden>Revenir aux profils</button>
   </section>
 
-  <!-- ÉCRAN 1 : connexion ou inscription -->
+  <!-- ÉCRAN 1 : choisir un profil déjà connecté sur cet appareil -->
+  <section class="card" id="ecran-choix" hidden>
+    <h2>Qui es-tu ?</h2>
+    <p class="intro">Touche ton profil pour l'ouvrir.</p>
+    <div class="grille" id="grille-profils"></div>
+    <p class="error" id="erreur-choix" hidden></p>
+    <button type="button" class="lien" id="gerer" style="justify-self:start">Gérer les profils</button>
+  </section>
+
+  <!-- ÉCRAN 2 : connexion ou inscription -->
   <section class="card" id="ecran-connexion" hidden>
+    <button type="button" class="lien" id="retour-choix" style="justify-self:start" hidden>← Retour aux profils</button>
     <div class="onglets" role="group" aria-label="Choisir">
       <button type="button" id="onglet-connexion" aria-pressed="true">Se connecter</button>
       <button type="button" id="onglet-inscription" aria-pressed="false">Créer un compte</button>
@@ -300,7 +339,46 @@ if (!window.supabase) {
   $("message-chargement").textContent = "Le site n'a pas pu charger ses outils. Vérifie ta connexion Internet, puis recharge la page.";
   throw new Error("Bibliothèque Supabase introuvable");
 }
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE);
+// L'appareil reste connecté : la session est gardée dans le navigateur
+// et renouvelée automatiquement.
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
+  auth: { persistSession: true, autoRefreshToken: true },
+});
+
+/* =========================================================
+   1 bis. LES PROFILS MÉMORISÉS SUR CET APPAREIL (façon Netflix)
+   Chaque profil déjà connecté ici est gardé avec son « jeton »
+   de connexion : on le rouvre d'un simple clic, sans mot de passe.
+   ========================================================= */
+const CLE_COMPTES = "couloir-comptes";
+
+function lireComptes() {
+  try { const c = JSON.parse(localStorage.getItem(CLE_COMPTES)); return Array.isArray(c) ? c : []; }
+  catch (e) { return []; }
+}
+function ecrireComptes(comptes) {
+  try { localStorage.setItem(CLE_COMPTES, JSON.stringify(comptes)); } catch (e) {}
+}
+function memoriserCompte(profil, email, jeton) {
+  const comptes = lireComptes();
+  const infos = { id: profil.id, prenom: profil.prenom, nom: profil.nom, role: profil.role, email, jeton };
+  const i = comptes.findIndex((c) => c.id === profil.id);
+  if (i >= 0) comptes[i] = infos; else comptes.push(infos);
+  ecrireComptes(comptes);
+}
+function oublierJeton(id) {
+  const comptes = lireComptes();
+  const c = comptes.find((c) => c.id === id);
+  if (c) { c.jeton = null; ecrireComptes(comptes); }
+}
+
+// Supabase renouvelle régulièrement le jeton : on garde toujours le plus récent.
+sb.auth.onAuthStateChange((evenement, session) => {
+  if (!session) return;
+  const comptes = lireComptes();
+  const c = comptes.find((c) => c.id === session.user.id);
+  if (c && c.jeton !== session.refresh_token) { c.jeton = session.refresh_token; ecrireComptes(comptes); }
+});
 
 /* =========================================================
    2. LES DONNÉES : toutes les lectures et écritures dans la base
@@ -388,7 +466,7 @@ async function pendant(bouton, texteAttente, action) {
 }
 
 // N'affiche qu'un seul écran à la fois
-const ECRANS = ["ecran-chargement", "ecran-connexion", "ecran-profil", "ecran-athlete", "ecran-coach"];
+const ECRANS = ["ecran-chargement", "ecran-choix", "ecran-connexion", "ecran-profil", "ecran-athlete", "ecran-coach"];
 function montrer(id) {
   ECRANS.forEach((e) => ($(e).hidden = e !== id));
   window.scrollTo(0, 0);
@@ -401,6 +479,7 @@ let moi = null; // le profil de la personne connectée
 
 async function apresConnexion(user) {
   montrer("ecran-chargement");
+  $("retour-erreur").hidden = true;
   $("message-chargement").textContent = "Chargement de ton profil…";
   try {
     moi = await donnees.monProfil(user.id);
@@ -416,22 +495,129 @@ async function apresConnexion(user) {
     router();
   } catch (e) {
     $("message-chargement").textContent = messageErreur(e);
+    $("retour-erreur").hidden = false;
+  }
+}
+$("retour-erreur").addEventListener("click", () => afficherChoix());
+
+// Mémorise le profil ouvert sur cet appareil, pour la grille « Qui es-tu ? »
+async function memoriserCompteActuel() {
+  const { data } = await sb.auth.getSession();
+  if (data.session && moi && data.session.user.id === moi.id) {
+    memoriserCompte(moi, data.session.user.email, data.session.refresh_token);
   }
 }
 
 function router() {
   $("session").hidden = !moi;
   if (moi) $("session-nom").replaceChildren(el("b", {}, moi.prenom), " · " + moi.role);
-  if (!moi) return afficherConnexion();
+  if (!moi) return afficherChoix();
+  memoriserCompteActuel();
   if (moi.role === "Coach") afficherCoach();
   else afficherAthlete();
 }
 
-$("deconnexion").addEventListener("click", async () => {
-  await sb.auth.signOut();
-  moi = null;
-  router();
+$("changer-profil").addEventListener("click", () => afficherChoix());
+
+/* =========================================================
+   4 bis. ÉCRAN « QUI ES-TU ? » (grille des profils de l'appareil)
+   ========================================================= */
+const COULEURS = ["--av1", "--av2", "--av3", "--av4", "--av5"];
+function couleurDe(id) {
+  let n = 0;
+  for (const c of id) n = (n * 31 + c.charCodeAt(0)) % 997;
+  return "var(" + COULEURS[n % COULEURS.length] + ")";
+}
+
+function afficherChoix() {
+  const comptes = lireComptes();
+  if (comptes.length === 0) return afficherConnexion();
+
+  const grille = $("grille-profils");
+  grille.classList.remove("gestion");
+  $("gerer").textContent = "Gérer les profils";
+  afficherMessage("erreur-choix", "");
+
+  const tuiles = comptes.map((c) => {
+    const avatar = el("span", { class: "avatar", "aria-hidden": "true" }, c.prenom.charAt(0));
+    avatar.style.setProperty("--av", couleurDe(c.id));
+    const bouton = el("button", { type: "button", class: "tuile" + (moi && moi.id === c.id ? " actif" : "") }, [
+      avatar,
+      el("span", { class: "tuile-nom" }, c.prenom),
+      el("span", { class: "badge" + (c.role === "Coach" ? " coach" : "") }, c.role),
+    ]);
+    bouton.addEventListener("click", () => basculerVers(c));
+    const retirer = el("button", { type: "button", class: "retirer", "aria-label": "Retirer " + c.prenom + " de cet appareil" }, "×");
+    retirer.addEventListener("click", () => retirerCompte(c));
+    return el("div", { class: "tuile-wrap" }, [bouton, retirer]);
+  });
+
+  const ajout = el("button", { type: "button", class: "tuile ajout" }, [
+    el("span", { class: "avatar", "aria-hidden": "true" }, "+"),
+    el("span", { class: "tuile-nom" }, "Ajouter un profil"),
+  ]);
+  ajout.addEventListener("click", () => {
+    changerMode(false);
+    $("email").value = "";
+    $("mdp").value = "";
+    afficherConnexion();
+  });
+
+  grille.replaceChildren(...tuiles, el("div", { class: "tuile-wrap" }, ajout));
+  montrer("ecran-choix");
+}
+
+$("gerer").addEventListener("click", () => {
+  const enGestion = $("grille-profils").classList.toggle("gestion");
+  $("gerer").textContent = enGestion ? "Terminé" : "Gérer les profils";
 });
+
+// Ouvre un autre profil de l'appareil, sans mot de passe
+async function basculerVers(compte) {
+  if (moi && moi.id === compte.id) return router();
+  if (!compte.jeton) return demanderMotDePasse(compte);
+
+  montrer("ecran-chargement");
+  $("retour-erreur").hidden = true;
+  $("message-chargement").textContent = "Ouverture du profil de " + compte.prenom + "…";
+  const { data, error } = await sb.auth.refreshSession({ refresh_token: compte.jeton });
+
+  if (error || !data.session) {
+    // Simple coupure de réseau : on garde le profil et on réessaiera
+    if (error && /Failed to fetch|NetworkError|Load failed/i.test(error.message || "")) {
+      afficherChoix();
+      return afficherMessage("erreur-choix", messageErreur(error));
+    }
+    // Jeton expiré ou retiré : il faut retaper le mot de passe une fois
+    oublierJeton(compte.id);
+    return demanderMotDePasse(compte);
+  }
+  moi = null;
+  apresConnexion(data.user);
+}
+
+function demanderMotDePasse(compte) {
+  changerMode(false);
+  $("email").value = compte.email || "";
+  $("mdp").value = "";
+  afficherConnexion();
+  afficherMessage("erreur-connexion", "Entre à nouveau le mot de passe de " + compte.prenom + " pour rouvrir son profil.");
+}
+
+// Retire un profil de la grille de cet appareil (il faudra le mot de passe pour le remettre)
+async function retirerCompte(compte) {
+  ecrireComptes(lireComptes().filter((c) => c.id !== compte.id));
+  if (moi && moi.id === compte.id) {
+    await sb.auth.signOut({ scope: "local" }); // déconnecte seulement cet appareil
+    moi = null;
+    $("session").hidden = true;
+  }
+  afficherChoix();
+  if (lireComptes().length > 0) {
+    $("grille-profils").classList.add("gestion");
+    $("gerer").textContent = "Terminé";
+  }
+}
 
 /* =========================================================
    5. ÉCRAN DE CONNEXION / INSCRIPTION
@@ -440,8 +626,12 @@ let modeInscription = false;
 
 function afficherConnexion() {
   afficherMessage("erreur-connexion", "");
+  $("retour-choix").hidden = lireComptes().length === 0;
   montrer("ecran-connexion");
 }
+$("retour-choix").addEventListener("click", () => {
+  if (moi) router(); else afficherChoix();
+});
 
 function changerMode(inscription) {
   modeInscription = inscription;
@@ -648,6 +838,8 @@ $("form-seance").addEventListener("submit", async (event) => {
 
 /* =========================================================
    9. DÉMARRAGE : déjà connecté(e) sur cet appareil ?
+   Oui : on rouvre directement le dernier profil utilisé.
+   Non : grille « Qui es-tu ? », ou écran de connexion si elle est vide.
    ========================================================= */
 (async () => {
   const { data } = await sb.auth.getSession();
