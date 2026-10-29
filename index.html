@@ -867,7 +867,8 @@ const ICONES = {
   profil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.2-3.5 4-5 7-5s5.8 1.5 7 5"/></svg>',
 };
 const NOMS_ONGLETS = { fil: "Fil", semaine: "Ma semaine", planifier: "Planifier", profil: "Profil" };
-function ongletsDe(p) { return p.role === "Coach" ? ["fil", "planifier", "profil"] : ["fil", "semaine", "profil"]; }
+// Le coach a aussi « Ma semaine », pour les séances qu'il se fixe à lui-même
+function ongletsDe(p) { return p.role === "Coach" ? ["fil", "semaine", "planifier", "profil"] : ["fil", "semaine", "profil"]; }
 
 function majEntete() {
   $("session").hidden = !moi;
@@ -968,7 +969,9 @@ let pageFil = 0;
 
 function carteFil(s) {
   const auteur = s.athlete || {};
-  const quoi = s.coach_id ? "a fait la séance de " + nomComplet(s.coach) : "a publié une séance";
+  const quoi = !s.coach_id ? "a publié une séance"
+    : s.coach_id === auteur.id ? "a fait sa séance prévue"
+    : "a fait la séance de " + nomComplet(s.coach);
   const carte = el("article", { class: "seance" }, [
     el("div", { class: "post-tete" }, [
       avatarEl(auteur, "petit"),
@@ -1148,7 +1151,9 @@ async function chargerSemaine() {
     liste.replaceChildren();
     if (seances.length === 0) {
       liste.append(el("p", { class: "vide" }, decalageSemaine === 0
-        ? "Pas de séance prévue cette semaine pour l'instant. Ton coach t'en enverra bientôt."
+        ? (moi.role === "Coach"
+          ? "Pas de séance prévue cette semaine. Pour t'en fixer une, va dans « Planifier » et choisis « Moi-même »."
+          : "Pas de séance prévue cette semaine pour l'instant. Ton coach t'en enverra bientôt.")
         : "Aucune séance prévue cette semaine-là."));
     } else {
       seances.forEach((s) => liste.append(carteSemaine(s)));
@@ -1175,7 +1180,7 @@ function carteSemaine(s) {
     s.titre ? el("p", { class: "seance-titre" }, s.titre) : "",
     s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : "",
     blocConsignes(s) || "",
-    el("p", { class: "muted petit" }, "Proposée par " + nomComplet(s.coach)),
+    el("p", { class: "muted petit" }, s.coach_id === moi.id ? "Séance que tu t'es fixée" : "Proposée par " + nomComplet(s.coach)),
     zone,
   );
 
@@ -1261,11 +1266,14 @@ async function afficherPlanifier() {
   afficherMessage("erreur-seance", "");
   if (!$("seance-date").value) $("seance-date").value = demain();
 
-  try { athletes = await donnees.athletes(); }
-  catch (e) { athletes = []; afficherMessage("erreur-seance", messageErreur(e)); }
+  // Le coach lui-même en premier, puis les athlètes
+  const moiMeme = { id: moi.id, prenom: moi.prenom, nom: moi.nom, discipline: moi.discipline, estMoi: true };
+  try { athletes = [moiMeme, ...(await donnees.athletes())]; }
+  catch (e) { athletes = [moiMeme]; afficherMessage("erreur-seance", messageErreur(e)); }
 
   const dejaChoisi = choixAthlete.value;
-  choixAthlete.replaceChildren(...athletes.map((a) => el("option", { value: a.id }, nomComplet(a) + (a.discipline ? " · " + a.discipline : ""))));
+  choixAthlete.replaceChildren(...athletes.map((a) => el("option", { value: a.id },
+    a.estMoi ? "Moi-même (" + a.prenom + ")" : nomComplet(a) + (a.discipline ? " · " + a.discipline : ""))));
   if (athletes.some((a) => a.id === dejaChoisi)) choixAthlete.value = dejaChoisi;
 
   const aucun = athletes.length === 0;
@@ -1300,12 +1308,14 @@ async function afficherSeancesCoach() {
   const athlete = athletes.find((a) => a.id === choixAthlete.value);
   const zone = $("coach-seances");
   if (!athlete) { zone.replaceChildren(); return; }
-  $("coach-titre-liste").textContent = "Séances de " + athlete.prenom;
+  $("coach-titre-liste").textContent = athlete.estMoi ? "Mes propres séances" : "Séances de " + athlete.prenom;
   zone.replaceChildren(el("p", { class: "muted" }, "Chargement…"));
   try {
     const seances = await donnees.seancesDuCoachPour(athlete.id);
     zone.replaceChildren();
-    if (seances.length === 0) zone.append(el("p", { class: "vide" }, "Aucune séance envoyée à " + athlete.prenom + " pour l'instant."));
+    if (seances.length === 0) zone.append(el("p", { class: "vide" }, athlete.estMoi
+      ? "Tu ne t'es encore fixé aucune séance. Elles apparaîtront aussi dans ton onglet « Ma semaine »."
+      : "Aucune séance envoyée à " + athlete.prenom + " pour l'instant."));
     else seances.forEach((s) => zone.append(carteCoach(s)));
   } catch (e) {
     zone.replaceChildren(el("p", { class: "error" }, messageErreur(e)));
@@ -1329,7 +1339,8 @@ $("form-seance").addEventListener("submit", async (event) => {
       titre: titre || null, contenu: contenu || null, consignes,
     }));
     // Le formulaire reste rempli : on peut envoyer la même séance à un autre athlète
-    afficherMessage("ok-seance", "Séance envoyée à " + athlete.prenom + ". Pour envoyer la même à quelqu'un d'autre, change d'athlète et clique à nouveau sur « Envoyer ».");
+    afficherMessage("ok-seance", (athlete.estMoi ? "Séance ajoutée à ta semaine." : "Séance envoyée à " + athlete.prenom + ".")
+      + " Pour envoyer la même à quelqu'un d'autre, change d'athlète et clique à nouveau sur « Envoyer ».");
     afficherSeancesCoach();
   } catch (e) {
     afficherMessage("erreur-seance", messageErreur(e));
