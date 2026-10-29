@@ -76,11 +76,6 @@ h3 {
 .intro { color: var(--muted); margin: -8px 0 0; }
 .muted { color: var(--muted); margin: 0; }
 
-/* Onglets Connexion / Inscription */
-.onglets { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); border-radius: 8px; padding: 4px; gap: 4px; }
-.onglets button { background: transparent; color: var(--muted); border-color: transparent; padding: 8px 10px; }
-.onglets button[aria-pressed="true"] { background: var(--track); color: var(--track-ink); }
-
 /* Formulaires */
 form { display: grid; gap: 16px; }
 .groupe { display: grid; gap: 16px; }
@@ -137,12 +132,6 @@ button.lien {
 .tuile.ajout .avatar { background: transparent; border: 2px dashed var(--line); color: var(--muted); }
 .tuile-nom { font-weight: 600; text-align: center; overflow-wrap: anywhere; line-height: 1.2; }
 .tuile .badge { font-size: 11px; }
-.retirer {
-  position: absolute; top: 0; right: 4px; width: 30px; height: 30px; padding: 0;
-  border-radius: 50%; background: var(--surface); color: var(--ink); border: 1px solid var(--line);
-  font-size: 18px; line-height: 1;
-}
-.grille:not(.gestion) .retirer { display: none; }
 
 /* Écrans d'accueil */
 .hello { font-family: var(--display); font-weight: 700; font-size: 44px; line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: .02em; overflow-wrap: anywhere; }
@@ -186,73 +175,28 @@ dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
   <!-- ÉCRAN 0 : chargement / erreur générale -->
   <section class="card" id="ecran-chargement">
     <p class="muted" id="message-chargement">Chargement…</p>
-    <button type="button" class="ghost" id="retour-erreur" style="justify-self:start" hidden>Revenir aux profils</button>
+    <button type="button" class="ghost" id="reessayer" style="justify-self:start" hidden>Réessayer</button>
   </section>
 
-  <!-- ÉCRAN 1 : choisir un profil déjà connecté sur cet appareil -->
+  <!-- ÉCRAN 1 : « Qui es-tu ? » — la page d'accueil -->
   <section class="card" id="ecran-choix" hidden>
     <h2>Qui es-tu ?</h2>
-    <p class="intro">Touche ton profil pour l'ouvrir.</p>
+    <p class="intro">Touche ton profil pour l'ouvrir. Pas encore de profil ? Ajoute le tien.</p>
     <div class="grille" id="grille-profils"></div>
-    <p class="error" id="erreur-choix" hidden></p>
-    <button type="button" class="lien" id="gerer" style="justify-self:start">Gérer les profils</button>
   </section>
 
-  <!-- ÉCRAN 2 : connexion ou inscription -->
-  <section class="card" id="ecran-connexion" hidden>
-    <button type="button" class="lien" id="retour-choix" style="justify-self:start" hidden>← Retour aux profils</button>
-    <div class="onglets" role="group" aria-label="Choisir">
-      <button type="button" id="onglet-connexion" aria-pressed="true">Se connecter</button>
-      <button type="button" id="onglet-inscription" aria-pressed="false">Créer un compte</button>
-    </div>
-
-    <form id="form-connexion" novalidate>
-      <!-- Champs affichés seulement pour l'inscription -->
-      <div class="groupe" id="champs-inscription" hidden>
-        <div class="row">
-          <div class="field">
-            <label for="ins-prenom">Prénom</label>
-            <input id="ins-prenom" autocomplete="given-name" placeholder="Lila">
-          </div>
-          <div class="field">
-            <label for="ins-nom">Nom</label>
-            <input id="ins-nom" autocomplete="family-name" placeholder="Martin">
-          </div>
-        </div>
-        <div class="field">
-          <label for="ins-discipline">Discipline principale</label>
-          <select id="ins-discipline"></select>
-        </div>
-      </div>
-
-      <div class="field">
-        <label for="email">E-mail</label>
-        <input id="email" type="email" autocomplete="email" placeholder="prenom@exemple.fr">
-      </div>
-      <div class="field">
-        <label for="mdp">Mot de passe</label>
-        <input id="mdp" type="password" autocomplete="current-password">
-        <p class="aide" id="aide-mdp" hidden>Au moins 6 caractères.</p>
-      </div>
-
-      <p class="error" id="erreur-connexion" hidden></p>
-      <p class="ok" id="ok-connexion" hidden></p>
-      <button type="submit" id="bouton-connexion">Se connecter</button>
-    </form>
-  </section>
-
-  <!-- ÉCRAN 2 : compléter ou modifier son profil -->
+  <!-- ÉCRAN 2 : ajouter ou modifier un profil -->
   <section class="card" id="ecran-profil" hidden>
-    <h2 id="titre-profil">Ton profil</h2>
+    <h2 id="titre-profil">Ajoute ton profil</h2>
     <form id="form-profil" novalidate>
       <div class="row">
         <div class="field">
           <label for="prenom">Prénom</label>
-          <input id="prenom" autocomplete="given-name">
+          <input id="prenom" autocomplete="given-name" placeholder="Lila">
         </div>
         <div class="field">
           <label for="nom">Nom</label>
-          <input id="nom" autocomplete="family-name">
+          <input id="nom" autocomplete="family-name" placeholder="Martin">
         </div>
       </div>
       <div class="field">
@@ -262,7 +206,7 @@ dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
       <p class="aide" id="info-role"></p>
       <p class="error" id="erreur-profil" hidden></p>
       <div class="actions">
-        <button type="submit" id="bouton-profil">Enregistrer</button>
+        <button type="submit" id="bouton-profil">Créer mon profil</button>
         <button type="button" class="ghost" id="annuler-profil">Retour</button>
       </div>
     </form>
@@ -287,7 +231,7 @@ dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
     <p class="hello coach">Salut <em id="coach-prenom"></em>&nbsp;!</p>
     <p class="muted">Choisis un athlète et écris-lui sa séance.</p>
 
-    <p class="vide" id="coach-aucun" hidden>Aucun athlète inscrit pour l'instant. Dès qu'un athlète aura créé son compte, il apparaîtra ici.</p>
+    <p class="vide" id="coach-aucun" hidden>Aucun athlète inscrit pour l'instant. Dès qu'un athlète aura ajouté son profil, il apparaîtra ici.</p>
 
     <form id="form-seance" novalidate>
       <div class="field">
@@ -322,8 +266,8 @@ dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 <script>
 /* =========================================================
    1. CONNEXION À SUPABASE
-   Ces deux informations sont publiques : la sécurité vient
-   des règles écrites dans Supabase (SQL Editor).
+   Ces deux informations sont publiques : ce que le site a le
+   droit de faire est fixé par les règles écrites dans Supabase.
    ========================================================= */
 const SUPABASE_URL = "https://qpsmqkldksginhhyndsu.supabase.co";
 const SUPABASE_CLE = "sb_publishable_LXOO1mpZnjwJhmLrNqGHIQ_-i7lmIfZ";
@@ -339,46 +283,16 @@ if (!window.supabase) {
   $("message-chargement").textContent = "Le site n'a pas pu charger ses outils. Vérifie ta connexion Internet, puis recharge la page.";
   throw new Error("Bibliothèque Supabase introuvable");
 }
-// L'appareil reste connecté : la session est gardée dans le navigateur
-// et renouvelée automatiquement.
+// Plus de comptes ni de mots de passe : le site n'ouvre aucune session.
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
-  auth: { persistSession: true, autoRefreshToken: true },
+  auth: { persistSession: false, autoRefreshToken: false },
 });
 
-/* =========================================================
-   1 bis. LES PROFILS MÉMORISÉS SUR CET APPAREIL (façon Netflix)
-   Chaque profil déjà connecté ici est gardé avec son « jeton »
-   de connexion : on le rouvre d'un simple clic, sans mot de passe.
-   ========================================================= */
-const CLE_COMPTES = "couloir-comptes";
-
-function lireComptes() {
-  try { const c = JSON.parse(localStorage.getItem(CLE_COMPTES)); return Array.isArray(c) ? c : []; }
-  catch (e) { return []; }
-}
-function ecrireComptes(comptes) {
-  try { localStorage.setItem(CLE_COMPTES, JSON.stringify(comptes)); } catch (e) {}
-}
-function memoriserCompte(profil, email, jeton) {
-  const comptes = lireComptes();
-  const infos = { id: profil.id, prenom: profil.prenom, nom: profil.nom, role: profil.role, email, jeton };
-  const i = comptes.findIndex((c) => c.id === profil.id);
-  if (i >= 0) comptes[i] = infos; else comptes.push(infos);
-  ecrireComptes(comptes);
-}
-function oublierJeton(id) {
-  const comptes = lireComptes();
-  const c = comptes.find((c) => c.id === id);
-  if (c) { c.jeton = null; ecrireComptes(comptes); }
-}
-
-// Supabase renouvelle régulièrement le jeton : on garde toujours le plus récent.
-sb.auth.onAuthStateChange((evenement, session) => {
-  if (!session) return;
-  const comptes = lireComptes();
-  const c = comptes.find((c) => c.id === session.user.id);
-  if (c && c.jeton !== session.refresh_token) { c.jeton = session.refresh_token; ecrireComptes(comptes); }
-});
+// Ménage : on efface ce que les anciennes versions avaient rangé dans le navigateur
+try {
+  localStorage.removeItem("couloir-comptes");
+  Object.keys(localStorage).filter((k) => k.startsWith("sb-")).forEach((k) => localStorage.removeItem(k));
+} catch (e) {}
 
 /* =========================================================
    2. LES DONNÉES : toutes les lectures et écritures dans la base
@@ -387,11 +301,14 @@ sb.auth.onAuthStateChange((evenement, session) => {
 function verifier({ data, error }) { if (error) throw error; return data; }
 
 const donnees = {
-  async monProfil(userId) {
-    return verifier(await sb.from("profils").select("*").eq("id", userId).maybeSingle());
+  async tousLesProfils() {
+    return verifier(await sb.from("profils").select("id, prenom, nom, role, discipline").order("prenom"));
+  },
+  async profil(id) {
+    return verifier(await sb.from("profils").select("id, prenom, nom, role, discipline").eq("id", id).maybeSingle());
   },
   async creerProfil(p) {
-    verifier(await sb.from("profils").insert(p));
+    return verifier(await sb.from("profils").insert(p).select("id, prenom, nom, role, discipline").single());
   },
   async modifierProfil(id, champs) {
     verifier(await sb.from("profils").update(champs).eq("id", id));
@@ -435,24 +352,16 @@ function formatDate(iso) {
 }
 function nomComplet(p) { return p ? (p.prenom + " " + (p.nom || "")).trim() : "Coach"; }
 
-// Remplit une liste déroulante de disciplines
 function remplirDisciplines(select) {
   select.replaceChildren(...DISCIPLINES.map((d) => el("option", {}, d)));
 }
-remplirDisciplines($("ins-discipline"));
 remplirDisciplines($("discipline"));
 
 // Traduit les messages d'erreur de Supabase en français clair
 function messageErreur(e) {
   const m = (e && (e.message || e.error_description)) || String(e);
-  if (/Invalid login credentials/i.test(m)) return "E-mail ou mot de passe incorrect.";
-  if (/already (been )?registered/i.test(m)) return "Un compte existe déjà avec cet e-mail. Connecte-toi plutôt.";
-  if (/Password should be at least|weak password/i.test(m)) return "Le mot de passe doit contenir au moins 6 caractères.";
-  if (/Email not confirmed/i.test(m)) return "Ton adresse e-mail n'est pas encore confirmée. Ouvre l'e-mail de confirmation, puis réessaie.";
-  if (/valid email|invalid format/i.test(m)) return "Cette adresse e-mail n'est pas valide.";
-  if (/rate limit|security purposes/i.test(m)) return "Trop de tentatives d'affilée. Patiente une minute, puis réessaie.";
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Impossible de joindre le serveur. Vérifie ta connexion Internet.";
-  if (/row-level security|permission denied/i.test(m)) return "Action refusée : tu n'as pas les droits nécessaires.";
+  if (/row-level security|permission denied/i.test(m)) return "Action refusée par les règles de la base de données.";
   return "Une erreur est survenue : " + m;
 }
 function afficherMessage(id, texte) { const p = $(id); p.textContent = texte || ""; p.hidden = !texte; }
@@ -466,53 +375,37 @@ async function pendant(bouton, texteAttente, action) {
 }
 
 // N'affiche qu'un seul écran à la fois
-const ECRANS = ["ecran-chargement", "ecran-choix", "ecran-connexion", "ecran-profil", "ecran-athlete", "ecran-coach"];
+const ECRANS = ["ecran-chargement", "ecran-choix", "ecran-profil", "ecran-athlete", "ecran-coach"];
 function montrer(id) {
   ECRANS.forEach((e) => ($(e).hidden = e !== id));
   window.scrollTo(0, 0);
 }
 
-/* =========================================================
-   4. QUI EST CONNECTÉ ?
-   ========================================================= */
-let moi = null; // le profil de la personne connectée
-
-async function apresConnexion(user) {
+// Écran d'attente ou d'erreur, avec un bouton « Réessayer » si besoin
+let actionReessayer = null;
+function chargement(texte, erreurAction) {
+  $("message-chargement").textContent = texte;
+  actionReessayer = erreurAction || null;
+  $("reessayer").hidden = !erreurAction;
   montrer("ecran-chargement");
-  $("retour-erreur").hidden = true;
-  $("message-chargement").textContent = "Chargement de ton profil…";
-  try {
-    moi = await donnees.monProfil(user.id);
-    // Premier passage : on crée le profil avec les infos données à l'inscription
-    if (!moi) {
-      const infos = user.user_metadata || {};
-      if (infos.prenom) {
-        await donnees.creerProfil({ id: user.id, prenom: infos.prenom, nom: infos.nom || null, discipline: infos.discipline || null });
-        moi = await donnees.monProfil(user.id);
-      }
-    }
-    if (!moi) { ouvrirFormulaireProfil(true); return; }
-    router();
-  } catch (e) {
-    $("message-chargement").textContent = messageErreur(e);
-    $("retour-erreur").hidden = false;
-  }
 }
-$("retour-erreur").addEventListener("click", () => afficherChoix());
+$("reessayer").addEventListener("click", () => actionReessayer && actionReessayer());
 
-// Mémorise le profil ouvert sur cet appareil, pour la grille « Qui es-tu ? »
-async function memoriserCompteActuel() {
-  const { data } = await sb.auth.getSession();
-  if (data.session && moi && data.session.user.id === moi.id) {
-    memoriserCompte(moi, data.session.user.email, data.session.refresh_token);
-  }
-}
+/* =========================================================
+   4. LE PROFIL OUVERT
+   Le navigateur retient seulement le dernier profil choisi,
+   pour le mettre en avant dans la grille.
+   ========================================================= */
+let moi = null;
 
-function router() {
-  $("session").hidden = !moi;
-  if (moi) $("session-nom").replaceChildren(el("b", {}, moi.prenom), " · " + moi.role);
-  if (!moi) return afficherChoix();
-  memoriserCompteActuel();
+function retenirDernier(id) { try { localStorage.setItem("couloir-dernier", id); } catch (e) {} }
+function dernierProfil() { try { return localStorage.getItem("couloir-dernier"); } catch (e) { return null; } }
+
+function ouvrirProfil(profil) {
+  moi = profil;
+  retenirDernier(profil.id);
+  $("session").hidden = false;
+  $("session-nom").replaceChildren(el("b", {}, moi.prenom), " · " + moi.role);
   if (moi.role === "Coach") afficherCoach();
   else afficherAthlete();
 }
@@ -520,7 +413,7 @@ function router() {
 $("changer-profil").addEventListener("click", () => afficherChoix());
 
 /* =========================================================
-   4 bis. ÉCRAN « QUI ES-TU ? » (grille des profils de l'appareil)
+   5. PAGE D'ACCUEIL « QUI ES-TU ? »
    ========================================================= */
 const COULEURS = ["--av1", "--av2", "--av3", "--av4", "--av5"];
 function couleurDe(id) {
@@ -529,173 +422,57 @@ function couleurDe(id) {
   return "var(" + COULEURS[n % COULEURS.length] + ")";
 }
 
-function afficherChoix() {
-  const comptes = lireComptes();
-  if (comptes.length === 0) return afficherConnexion();
+async function afficherChoix() {
+  moi = null;
+  $("session").hidden = true;
+  chargement("Chargement des profils…");
 
-  const grille = $("grille-profils");
-  grille.classList.remove("gestion");
-  $("gerer").textContent = "Gérer les profils";
-  afficherMessage("erreur-choix", "");
+  let profils;
+  try {
+    profils = await donnees.tousLesProfils();
+  } catch (e) {
+    return chargement(messageErreur(e), afficherChoix);
+  }
 
-  const tuiles = comptes.map((c) => {
-    const avatar = el("span", { class: "avatar", "aria-hidden": "true" }, c.prenom.charAt(0));
-    avatar.style.setProperty("--av", couleurDe(c.id));
-    const bouton = el("button", { type: "button", class: "tuile" + (moi && moi.id === c.id ? " actif" : "") }, [
+  const dernier = dernierProfil();
+  const tuiles = profils.map((p) => {
+    const avatar = el("span", { class: "avatar", "aria-hidden": "true" }, p.prenom.charAt(0));
+    avatar.style.setProperty("--av", couleurDe(p.id));
+    const bouton = el("button", { type: "button", class: "tuile" + (p.id === dernier ? " actif" : "") }, [
       avatar,
-      el("span", { class: "tuile-nom" }, c.prenom),
-      el("span", { class: "badge" + (c.role === "Coach" ? " coach" : "") }, c.role),
+      el("span", { class: "tuile-nom" }, nomComplet(p)),
+      el("span", { class: "badge" + (p.role === "Coach" ? " coach" : "") }, p.role),
     ]);
-    bouton.addEventListener("click", () => basculerVers(c));
-    const retirer = el("button", { type: "button", class: "retirer", "aria-label": "Retirer " + c.prenom + " de cet appareil" }, "×");
-    retirer.addEventListener("click", () => retirerCompte(c));
-    return el("div", { class: "tuile-wrap" }, [bouton, retirer]);
+    bouton.addEventListener("click", () => ouvrirProfil(p));
+    return el("div", { class: "tuile-wrap" }, bouton);
   });
 
   const ajout = el("button", { type: "button", class: "tuile ajout" }, [
     el("span", { class: "avatar", "aria-hidden": "true" }, "+"),
-    el("span", { class: "tuile-nom" }, "Ajouter un profil"),
+    el("span", { class: "tuile-nom" }, "Ajouter mon profil"),
   ]);
-  ajout.addEventListener("click", () => {
-    changerMode(false);
-    $("email").value = "";
-    $("mdp").value = "";
-    afficherConnexion();
-  });
+  ajout.addEventListener("click", () => ouvrirFormulaireProfil(null));
 
-  grille.replaceChildren(...tuiles, el("div", { class: "tuile-wrap" }, ajout));
+  $("grille-profils").replaceChildren(...tuiles, el("div", { class: "tuile-wrap" }, ajout));
   montrer("ecran-choix");
 }
 
-$("gerer").addEventListener("click", () => {
-  const enGestion = $("grille-profils").classList.toggle("gestion");
-  $("gerer").textContent = enGestion ? "Terminé" : "Gérer les profils";
-});
-
-// Ouvre un autre profil de l'appareil, sans mot de passe
-async function basculerVers(compte) {
-  if (moi && moi.id === compte.id) return router();
-  if (!compte.jeton) return demanderMotDePasse(compte);
-
-  montrer("ecran-chargement");
-  $("retour-erreur").hidden = true;
-  $("message-chargement").textContent = "Ouverture du profil de " + compte.prenom + "…";
-  const { data, error } = await sb.auth.refreshSession({ refresh_token: compte.jeton });
-
-  if (error || !data.session) {
-    // Simple coupure de réseau : on garde le profil et on réessaiera
-    if (error && /Failed to fetch|NetworkError|Load failed/i.test(error.message || "")) {
-      afficherChoix();
-      return afficherMessage("erreur-choix", messageErreur(error));
-    }
-    // Jeton expiré ou retiré : il faut retaper le mot de passe une fois
-    oublierJeton(compte.id);
-    return demanderMotDePasse(compte);
-  }
-  moi = null;
-  apresConnexion(data.user);
-}
-
-function demanderMotDePasse(compte) {
-  changerMode(false);
-  $("email").value = compte.email || "";
-  $("mdp").value = "";
-  afficherConnexion();
-  afficherMessage("erreur-connexion", "Entre à nouveau le mot de passe de " + compte.prenom + " pour rouvrir son profil.");
-}
-
-// Retire un profil de la grille de cet appareil (il faudra le mot de passe pour le remettre)
-async function retirerCompte(compte) {
-  ecrireComptes(lireComptes().filter((c) => c.id !== compte.id));
-  if (moi && moi.id === compte.id) {
-    await sb.auth.signOut({ scope: "local" }); // déconnecte seulement cet appareil
-    moi = null;
-    $("session").hidden = true;
-  }
-  afficherChoix();
-  if (lireComptes().length > 0) {
-    $("grille-profils").classList.add("gestion");
-    $("gerer").textContent = "Terminé";
-  }
-}
-
 /* =========================================================
-   5. ÉCRAN DE CONNEXION / INSCRIPTION
+   6. FORMULAIRE DE PROFIL (ajout ou modification)
    ========================================================= */
-let modeInscription = false;
+let profilEnModification = null; // null = ajout d'un nouveau profil
 
-function afficherConnexion() {
-  afficherMessage("erreur-connexion", "");
-  $("retour-choix").hidden = lireComptes().length === 0;
-  montrer("ecran-connexion");
-}
-$("retour-choix").addEventListener("click", () => {
-  if (moi) router(); else afficherChoix();
-});
-
-function changerMode(inscription) {
-  modeInscription = inscription;
-  $("onglet-connexion").setAttribute("aria-pressed", String(!inscription));
-  $("onglet-inscription").setAttribute("aria-pressed", String(inscription));
-  $("champs-inscription").hidden = !inscription;
-  $("aide-mdp").hidden = !inscription;
-  $("mdp").setAttribute("autocomplete", inscription ? "new-password" : "current-password");
-  $("bouton-connexion").textContent = inscription ? "Créer mon compte" : "Se connecter";
-  afficherMessage("erreur-connexion", "");
-  afficherMessage("ok-connexion", "");
-}
-$("onglet-connexion").addEventListener("click", () => changerMode(false));
-$("onglet-inscription").addEventListener("click", () => changerMode(true));
-
-$("form-connexion").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  afficherMessage("erreur-connexion", "");
-  afficherMessage("ok-connexion", "");
-  const email = $("email").value.trim();
-  const motDePasse = $("mdp").value;
-  if (!email || !motDePasse) return afficherMessage("erreur-connexion", "Indique ton e-mail et ton mot de passe.");
-
-  try {
-    await pendant($("bouton-connexion"), "Un instant…", async () => {
-      if (modeInscription) {
-        const prenom = $("ins-prenom").value.trim();
-        if (!prenom) throw new Error("Indique ton prénom pour créer ton compte.");
-        const { data, error } = await sb.auth.signUp({
-          email, password: motDePasse,
-          options: { data: { prenom, nom: $("ins-nom").value.trim(), discipline: $("ins-discipline").value } },
-        });
-        if (error) throw error;
-        if (data.session) return apresConnexion(data.user);
-        // Si la confirmation par e-mail est activée dans Supabase
-        changerMode(false);
-        afficherMessage("ok-connexion", "Compte créé ! Confirme ton adresse grâce à l'e-mail reçu, puis connecte-toi.");
-      } else {
-        const { data, error } = await sb.auth.signInWithPassword({ email, password: motDePasse });
-        if (error) throw error;
-        return apresConnexion(data.user);
-      }
-    });
-  } catch (e) {
-    afficherMessage("erreur-connexion", e.message?.startsWith("Indique") ? e.message : messageErreur(e));
-  }
-});
-
-/* =========================================================
-   6. FORMULAIRE DE PROFIL
-   ========================================================= */
-let creationProfil = false;
-
-function ouvrirFormulaireProfil(creation) {
-  creationProfil = creation;
+function ouvrirFormulaireProfil(profil) {
+  profilEnModification = profil;
   afficherMessage("erreur-profil", "");
-  $("titre-profil").textContent = creation ? "Complète ton profil" : "Modifier mon profil";
-  $("annuler-profil").hidden = creation;
-  $("prenom").value = moi?.prenom || "";
-  $("nom").value = moi?.nom || "";
-  $("discipline").value = moi?.discipline || DISCIPLINES[0];
-  $("info-role").textContent = moi
-    ? (moi.role === "Coach" ? "Ton rôle : Coach." : "Ton rôle : Athlète. Le rôle Coach est attribué par l'administratrice du site.")
-    : "";
+  $("titre-profil").textContent = profil ? "Modifier mon profil" : "Ajoute ton profil";
+  $("bouton-profil").textContent = profil ? "Enregistrer" : "Créer mon profil";
+  $("prenom").value = profil?.prenom || "";
+  $("nom").value = profil?.nom || "";
+  $("discipline").value = profil?.discipline || DISCIPLINES[0];
+  $("info-role").textContent = profil && profil.role === "Coach"
+    ? "Ton rôle : Coach."
+    : "Ton rôle : Athlète. Le rôle Coach est attribué par l'administratrice du site.";
   montrer("ecran-profil");
 }
 
@@ -704,20 +481,23 @@ $("form-profil").addEventListener("submit", async (event) => {
   const champs = { prenom: $("prenom").value.trim(), nom: $("nom").value.trim() || null, discipline: $("discipline").value };
   if (!champs.prenom) return afficherMessage("erreur-profil", "Indique ton prénom.");
   try {
+    let profil;
     await pendant($("bouton-profil"), "Enregistrement…", async () => {
-      const { data } = await sb.auth.getUser();
-      if (creationProfil) await donnees.creerProfil({ id: data.user.id, ...champs });
-      else await donnees.modifierProfil(moi.id, champs);
-      moi = await donnees.monProfil(data.user.id);
+      if (profilEnModification) {
+        await donnees.modifierProfil(profilEnModification.id, champs);
+        profil = await donnees.profil(profilEnModification.id);
+      } else {
+        profil = await donnees.creerProfil(champs);
+      }
     });
-    router();
+    ouvrirProfil(profil);
   } catch (e) {
     afficherMessage("erreur-profil", messageErreur(e));
   }
 });
-$("annuler-profil").addEventListener("click", router);
-$("modifier-athlete").addEventListener("click", () => ouvrirFormulaireProfil(false));
-$("modifier-coach").addEventListener("click", () => ouvrirFormulaireProfil(false));
+$("annuler-profil").addEventListener("click", () => (moi ? ouvrirProfil(moi) : afficherChoix()));
+$("modifier-athlete").addEventListener("click", () => ouvrirFormulaireProfil(moi));
+$("modifier-coach").addEventListener("click", () => ouvrirFormulaireProfil(moi));
 
 /* =========================================================
    7. ESPACE ATHLÈTE : voir ses séances
@@ -837,15 +617,9 @@ $("form-seance").addEventListener("submit", async (event) => {
 });
 
 /* =========================================================
-   9. DÉMARRAGE : déjà connecté(e) sur cet appareil ?
-   Oui : on rouvre directement le dernier profil utilisé.
-   Non : grille « Qui es-tu ? », ou écran de connexion si elle est vide.
+   9. DÉMARRAGE : on arrive toujours sur « Qui es-tu ? »
    ========================================================= */
-(async () => {
-  const { data } = await sb.auth.getSession();
-  if (data.session) apresConnexion(data.session.user);
-  else router();
-})();
+afficherChoix();
 </script>
 </body>
 </html>
