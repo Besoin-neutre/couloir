@@ -250,6 +250,11 @@ button.cocher:hover .case { background: var(--ok); }
 .description { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
 .stat { font-family: var(--display); font-size: 36px; font-weight: 700; line-height: 1; margin: 0; font-variant-numeric: tabular-nums; }
 .photo-ligne { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+/* Photo d'une séance */
+.photo-seance { display: block; border-radius: 8px; overflow: hidden; background: var(--line); }
+.photo-seance img { display: block; width: 100%; max-height: 440px; object-fit: cover; }
+.apercu-photo img { display: block; max-width: 100%; max-height: 240px; border-radius: 8px; }
 .photo-ligne > div { display: grid; gap: 6px; }
 
 /* Modèles de séance (coach) */
@@ -458,6 +463,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
           <label for="pub-commentaire">Ton ressenti</label>
           <textarea id="pub-commentaire" placeholder="Bonnes sensations, jambes un peu lourdes au début…"></textarea>
         </div>
+        <div id="pub-photo"></div>
         <p class="error" id="erreur-publier" hidden></p>
         <div class="actions">
           <button type="submit" id="bouton-publier">Publier</button>
@@ -679,7 +685,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
 function verifier({ data, error }) { if (error) throw error; return data; }
 
 const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url, couleur";
-const CHAMPS_SEANCE = "id, date, type, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
+const CHAMPS_SEANCE = "id, date, type, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
 const CHAMPS_COMMENTAIRE = "id, texte, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url, couleur)";
 const CHAMPS_FIL = CHAMPS_SEANCE
   + ", athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url, couleur)"
@@ -708,6 +714,11 @@ const donnees = {
     return count || 0;
   },
   // Photo de profil : rangée dans le dossier « photos » de Supabase
+  async envoyerPhotoSeance(profilId, blob) {
+    const chemin = profilId + "/seances/" + Date.now() + ".jpg";
+    verifier(await sb.storage.from("photos").upload(chemin, blob, { contentType: "image/jpeg" }));
+    return sb.storage.from("photos").getPublicUrl(chemin).data.publicUrl;
+  },
   async envoyerPhoto(profilId, blob) {
     const chemin = profilId + "/" + Date.now() + ".jpg";
     verifier(await sb.storage.from("photos").upload(chemin, blob, { contentType: "image/jpeg" }));
@@ -1064,6 +1075,76 @@ function champsEffort(prefixe, s = {}) {
 }
 
 // Réduit une photo en carré de 320 px (plus légère à envoyer et à afficher)
+// Réduit une photo de séance à 1 280 px maximum sur le plus grand côté (sans la recadrer)
+async function preparerImage(fichier, maximum = 1280) {
+  const url = URL.createObjectURL(fichier);
+  try {
+    const img = await new Promise((ok, ko) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = () => ko(erreurLisible("Cette image ne peut pas être lue. Essaie une photo en JPEG ou PNG."));
+      i.src = url;
+    });
+    const ratio = Math.min(1, maximum / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * ratio);
+    c.height = Math.round(img.naturalHeight * ratio);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.82));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// Champ « Ajouter une photo » avec aperçu ; url() envoie la photo et renvoie son adresse
+function champPhoto(prefixe, urlExistante) {
+  let nouvelle = null, retiree = false, apercuUrl = null;
+  const input = el("input", { type: "file", id: prefixe + "-photo", accept: "image/*", class: "visuellement-cache" });
+  const texte = document.createTextNode("Ajouter une photo");
+  const bouton = el("label", { class: "bouton-fichier" }, [texte, input]);
+  const apercu = el("div", { class: "apercu-photo" });
+  const retirer = el("button", { type: "button", class: "lien petit" }, "Retirer la photo");
+  const erreur = el("p", { class: "error", hidden: "" });
+
+  function afficher(src) {
+    apercu.replaceChildren(...(src ? [el("img", { src, alt: "Aperçu de la photo" })] : []));
+    apercu.hidden = !src;
+    retirer.hidden = !src;
+    texte.textContent = src ? "Changer la photo" : "Ajouter une photo";
+  }
+  input.addEventListener("change", async () => {
+    const fichier = input.files[0];
+    input.value = "";
+    if (!fichier) return;
+    erreur.hidden = true;
+    try {
+      nouvelle = await preparerImage(fichier);
+      retiree = false;
+      if (apercuUrl) URL.revokeObjectURL(apercuUrl);
+      apercuUrl = URL.createObjectURL(nouvelle);
+      afficher(apercuUrl);
+    } catch (e) {
+      erreur.textContent = messageErreur(e);
+      erreur.hidden = false;
+    }
+  });
+  retirer.addEventListener("click", () => { nouvelle = null; retiree = true; afficher(null); });
+  afficher(urlExistante);
+
+  return {
+    bloc: el("div", { class: "field" }, [el("span", { class: "label" }, "Photo (facultatif)"), apercu, el("div", { class: "actions" }, [bouton, retirer]), erreur]),
+    async url(profilId) {
+      if (nouvelle) return donnees.envoyerPhotoSeance(profilId, nouvelle);
+      return retiree ? null : urlExistante || null;
+    },
+  };
+}
+function photoDeSeance(s, auteur) {
+  if (!s.photo_url) return null;
+  return el("a", { class: "photo-seance", href: s.photo_url, target: "_blank", rel: "noopener" },
+    el("img", { src: s.photo_url, alt: "Photo de la séance" + (auteur ? " de " + nomComplet(auteur) : ""), loading: "lazy" }));
+}
+
 async function preparerPhoto(fichier) {
   const url = URL.createObjectURL(fichier);
   try {
@@ -1247,6 +1328,7 @@ function carteFil(s) {
     s.date ? enTeteSeance(s) : null,
     s.titre ? el("p", { class: "seance-titre" }, s.titre) : null,
     s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : null,
+    photoDeSeance(s, auteur),
     etatEffort(s),
     s.commentaire ? el("blockquote", { class: "commentaire" }, s.commentaire) : null,
   ]);
@@ -1351,10 +1433,13 @@ $("fil-plus").addEventListener("click", () => pendant($("fil-plus"), "Chargement
 
 // Publier une séance faite de son côté
 let ressentiPublier = null;
+let photoPublier = null;
 $("ouvrir-publier").addEventListener("click", () => {
   $("form-publier").reset();
   $("pub-date").value = aujourdhui();
   ressentiPublier = choixRessenti("pub-rpe", null);
+  photoPublier = champPhoto("pub-image", null);
+  $("pub-photo").replaceChildren(photoPublier.bloc);
   $("pub-ressenti").replaceChildren(ressentiPublier);
   afficherMessage("erreur-publier", "");
   $("form-publier").hidden = false;
@@ -1371,11 +1456,12 @@ $("form-publier").addEventListener("submit", async (event) => {
   if (!titre && !contenu) return afficherMessage("erreur-publier", "Donne au moins un titre ou un contenu à ta séance.");
   try {
     const effort = lireEffort($("pub-distance"), $("pub-duree"));
-    await pendant($("bouton-publier"), "Publication…", () => donnees.envoyerSeance({
+    await pendant($("bouton-publier"), "Publication…", async () => donnees.envoyerSeance({
       athlete_id: moi.id, coach_id: null,
       date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null,
       fait: true, fait_le: new Date().toISOString(),
       ressenti: ressentiPublier.valeur(), commentaire: $("pub-commentaire").value.trim() || null,
+      photo_url: await photoPublier.url(moi.id),
       ...effort,
     }));
     fermerPublier();
@@ -1462,12 +1548,13 @@ function carteSemaine(s) {
       return;
     }
     zone.append(etatEffort(s, [el("span", { class: "pill faite" }, "✓ Faite")]));
+    if (s.photo_url) zone.append(photoDeSeance(s));
     if (s.commentaire) zone.append(el("blockquote", { class: "commentaire" }, s.commentaire));
     const modifier = el("button", { type: "button", class: "lien petit" }, "Modifier mon ressenti");
     modifier.addEventListener("click", ouvrirFormulaire);
     const decocher = el("button", { type: "button", class: "lien petit" }, "Marquer comme non faite");
     decocher.addEventListener("click", async () => {
-      const maj = { fait: false, fait_le: null, ressenti: null, commentaire: null, distance_km: null, duree_min: null };
+      const maj = { fait: false, fait_le: null, ressenti: null, commentaire: null, distance_km: null, duree_min: null, photo_url: null };
       try { await pendant(decocher, "…", () => donnees.majSeance(s.id, maj)); Object.assign(s, maj); afficherEtat(); majProgression(); }
       catch (e) { zone.append(el("p", { class: "error" }, messageErreur(e))); }
     });
@@ -1478,6 +1565,7 @@ function carteSemaine(s) {
   function ouvrirFormulaire() {
     const rpe = choixRessenti("rpe-" + s.id, s.ressenti);
     const effort = champsEffort("effort-" + s.id, s);
+    const photo = champPhoto("seance-" + s.id, s.photo_url);
     const idCom = "com-" + s.id;
     const com = el("textarea", { id: idCom, placeholder: "Comment ça s'est passé ? Sensations, chronos, douleurs…" });
     com.value = s.commentaire || "";
@@ -1494,7 +1582,10 @@ function carteSemaine(s) {
           commentaire: com.value.trim() || null,
           ...lireEffort(effort.dist, effort.duree),
         };
-        await pendant(valider, "Enregistrement…", () => donnees.majSeance(s.id, maj));
+        await pendant(valider, "Enregistrement…", async () => {
+          maj.photo_url = await photo.url(moi.id);
+          await donnees.majSeance(s.id, maj);
+        });
         Object.assign(s, maj);
         afficherEtat();
         majProgression();
@@ -1509,6 +1600,7 @@ function carteSemaine(s) {
       effort.bloc,
       rpe,
       el("div", { class: "field" }, [el("label", { for: idCom }, "Ton ressenti"), com]),
+      photo.bloc,
       erreur,
       el("div", { class: "actions" }, [valider, annuler]),
     ]));
@@ -1560,6 +1652,7 @@ function carteCoach(s) {
     s.fait
       ? etatEffort(s, [el("span", { class: "pill faite" }, "✓ Faite")])
       : el("div", { class: "etat" }, el("span", { class: "pill" }, "À faire")),
+    s.fait ? photoDeSeance(s) : null,
     s.fait && s.commentaire ? el("blockquote", { class: "commentaire" }, s.commentaire) : null,
   ]);
   const b = el("button", { class: "lien petit", type: "button", style: "justify-self:start" }, "Supprimer");
