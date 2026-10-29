@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Couloir</title>
+<title>Séances d'athlé</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Source+Sans+3:wght@400;600&display=swap">
 <style>
@@ -21,7 +21,9 @@
   --ok: #2d7a4b;          /* vert : fait / facile */
   --moyen: #a86b12;       /* ambre : effort moyen */
   --dur: #b8432f;         /* rouge : effort dur */
-  --av1: #b8432f; --av2: #2f5d8a; --av3: #2d7a4b; --av4: #8a5a2f; --av5: #6b4f8f; /* couleurs des avatars */
+  /* Couleurs de profil, choisies par chacun */
+  --p-rouge: #c0392b; --p-orange: #b9540b; --p-jaune: #9a6a00; --p-vert: #2f7d32; --p-turquoise: #0f766e;
+  --p-bleu: #1f63b5; --p-marron: #7a4b2a; --p-violet: #7d3ca8; --p-rose: #b8336a; --p-ardoise: #4b5a68;
   --or: #a87b05; --or-fond: #f6ecd0; --argent: #8a96a3; --bronze: #a0643a; /* médailles */
   --display: "Barlow Condensed", "Arial Narrow", sans-serif;
   --body: "Source Sans 3", system-ui, sans-serif;
@@ -32,7 +34,8 @@
     --bg: #11171d; --surface: #1a232c; --ink: #e8edf1; --muted: #9aa8b4;
     --line: #2d3a46; --track: #e0664f; --track-ink: #11171d; --coach: #7fb0de; --ok: #6cc28e;
     --moyen: #e2a64a; --dur: #e0664f;
-    --av1: #e0664f; --av2: #7fb0de; --av3: #6cc28e; --av4: #d9a066; --av5: #b39ddb;
+    --p-rouge: #ef7a6a; --p-orange: #f59e5b; --p-jaune: #e8bf4f; --p-vert: #6cc77a; --p-turquoise: #4fc7bb;
+    --p-bleu: #74a9ec; --p-marron: #d2a07a; --p-violet: #c08ae6; --p-rose: #f08cb5; --p-ardoise: #a9b7c4;
     --or: #e3b341; --or-fond: #3a321c; --argent: #b5c0cb; --bronze: #d08a5a;
     color-scheme: dark;
   }
@@ -54,19 +57,24 @@ body {
 body.avec-nav { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
 .wrap { max-width: 560px; margin: 0 auto; display: grid; gap: 20px; }
 
-/* En-tête avec les lignes de couloir */
+/* En-tête : la personne connectée et « Changer de profil » */
 .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-.brand { display: flex; align-items: center; gap: 12px; }
-.lanes { display: flex; gap: 3px; }
-.lanes span { width: 4px; height: 26px; background: var(--track); border-radius: 1px; }
-.lanes span:nth-child(2) { opacity: .7; }
-.lanes span:nth-child(3) { opacity: .45; }
-.brand h1 {
-  font-family: var(--display); font-weight: 700; font-size: 28px;
-  letter-spacing: .04em; text-transform: uppercase; margin: 0;
+.moi { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.moi b { font-family: var(--display); font-size: 24px; font-weight: 700; letter-spacing: .02em; overflow-wrap: anywhere; }
+
+/* Pastilles de couleur de profil */
+.couleurs { display: flex; flex-wrap: wrap; gap: 10px; }
+.couleurs input { position: absolute; opacity: 0; pointer-events: none; }
+.couleurs label {
+  width: 40px; height: 40px; border-radius: 50%; background: var(--c); cursor: pointer;
+  display: grid; place-items: center; color: var(--surface);
+  font-size: 13px; font-weight: 700; letter-spacing: 0; text-transform: none;
+  border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--line);
 }
-.session { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
-.session b { color: var(--ink); }
+.couleurs input:checked + label { box-shadow: 0 0 0 3px var(--ink); }
+.couleurs input:checked + label span { display: none; }
+.couleurs input:checked + label::after { content: "✓"; font-size: 18px; }
+.couleurs input:focus-visible + label { outline: 2px solid var(--track); outline-offset: 4px; }
 
 .card {
   background: var(--surface); border: 1px solid var(--line);
@@ -133,7 +141,7 @@ button.lien {
   background: var(--av, var(--track)); color: var(--surface);
   border: 3px solid transparent; overflow: hidden;
 }
-.avatar.photo { background: var(--line); }
+.avatar.photo { background: var(--line); box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--av, var(--line)); }
 .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .avatar.grand { width: 96px; height: 96px; font-size: 48px; border-radius: 16px; border-width: 0; }
 .avatar.petit { width: 40px; height: 40px; font-size: 20px; border-radius: 10px; border-width: 0; }
@@ -168,7 +176,7 @@ button.lien {
   font-size: 11px; letter-spacing: .03em; text-transform: uppercase; min-width: 0;
 }
 .nav button svg { width: 24px; height: 24px; }
-.nav button[aria-current="page"] { color: var(--track); }
+.nav button[aria-current="page"] { color: var(--track); box-shadow: inset 0 3px 0 var(--track); }
 .panneau { display: grid; gap: 16px; min-width: 0; }
 .entete-panneau { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
 
@@ -176,6 +184,7 @@ button.lien {
 .seances, .fil { display: grid; gap: 12px; }
 .seance { border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 8px; background: var(--surface); min-width: 0; }
 .seance.faite { border-left: 4px solid var(--ok); }
+.seance.post { border-left: 4px solid var(--auteur, var(--line)); }
 .seance-date { font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--track); }
 .seance-titre { font-weight: 600; font-size: 18px; margin: 0; overflow-wrap: anywhere; }
 .seance-contenu { white-space: pre-line; margin: 0; overflow-wrap: anywhere; }
@@ -349,16 +358,12 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
 </head>
 <body>
 <div class="wrap">
-  <div class="top">
-    <div class="brand">
-      <div class="lanes" aria-hidden="true"><span></span><span></span><span></span></div>
-      <h1>Couloir</h1>
-    </div>
-    <div class="session" id="session" hidden>
+  <div class="top" id="session" hidden>
+    <div class="moi">
       <span id="session-avatar"></span>
       <b id="session-nom"></b>
-      <button class="lien" type="button" id="changer-profil">Changer</button>
     </div>
+    <button class="ghost compact" type="button" id="changer-profil">Changer de profil</button>
   </div>
 
   <!-- ÉCRAN : chargement / erreur générale -->
@@ -392,6 +397,11 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
         <label for="discipline">Discipline principale</label>
         <select id="discipline"></select>
       </div>
+      <fieldset>
+        <legend class="label">Ta couleur</legend>
+        <div class="couleurs" id="couleurs-creation"></div>
+        <p class="aide">Elle te rend reconnaissable partout dans l'appli. Les couleurs déjà prises montrent l'initiale de la personne.</p>
+      </fieldset>
       <p class="aide">Tu pourras ajouter une photo et une description ensuite, dans l'onglet Profil.</p>
       <p class="error" id="erreur-creation" hidden></p>
       <div class="actions">
@@ -608,6 +618,10 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
           <label for="pf-discipline">Discipline principale</label>
           <select id="pf-discipline"></select>
         </div>
+        <fieldset>
+          <legend class="label">Ma couleur</legend>
+          <div class="couleurs" id="couleurs-pf"></div>
+        </fieldset>
         <div class="field">
           <label for="pf-description">Description</label>
           <textarea id="pf-description" maxlength="300" placeholder="Objectifs de la saison, records, ce que tu aimes courir…"></textarea>
@@ -658,11 +672,11 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
    ========================================================= */
 function verifier({ data, error }) { if (error) throw error; return data; }
 
-const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url";
+const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url, couleur";
 const CHAMPS_SEANCE = "id, date, type, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
-const CHAMPS_COMMENTAIRE = "id, texte, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url)";
+const CHAMPS_COMMENTAIRE = "id, texte, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url, couleur)";
 const CHAMPS_FIL = CHAMPS_SEANCE
-  + ", athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url)"
+  + ", athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url, couleur)"
   + ", commentaires(" + CHAMPS_COMMENTAIRE + ")";
 
 const donnees = {
@@ -805,12 +819,39 @@ async function pendant(bouton, texteAttente, action) {
   finally { bouton.disabled = false; bouton.textContent = texte; }
 }
 
-// Avatar : la photo si elle existe, sinon l'initiale sur une couleur
-const COULEURS = ["--av1", "--av2", "--av3", "--av4", "--av5"];
-function couleurDe(id) {
+// Couleurs de profil : chacun choisit la sienne
+const COULEURS = {
+  rouge: "Rouge", orange: "Orange", jaune: "Jaune", vert: "Vert", turquoise: "Turquoise",
+  bleu: "Bleu", marron: "Marron", violet: "Violet", rose: "Rose", ardoise: "Gris ardoise",
+};
+// La couleur choisie, ou une couleur attribuée d'office aux anciens profils
+function cleCouleur(p) {
+  if (p && COULEURS[p.couleur]) return p.couleur;
   let n = 0;
-  for (const c of String(id)) n = (n * 31 + c.charCodeAt(0)) % 997;
-  return "var(" + COULEURS[n % COULEURS.length] + ")";
+  for (const c of String((p && p.id) || "x")) n = (n * 31 + c.charCodeAt(0)) % 997;
+  const cles = Object.keys(COULEURS);
+  return cles[n % cles.length];
+}
+function couleurDe(p) { return "var(--p-" + cleCouleur(p) + ")"; }
+
+// Pastilles de couleur à choisir (les couleurs déjà prises affichent l'initiale de la personne)
+let profilsConnus = [];
+function choixCouleur(conteneur, nomGroupe, valeur, sansCeProfil) {
+  const prises = {};
+  profilsConnus.filter((p) => p.id !== sansCeProfil).forEach((p) => {
+    (prises[cleCouleur(p)] ||= []).push(p.prenom.charAt(0).toUpperCase());
+  });
+  if (!valeur) valeur = Object.keys(COULEURS).find((c) => !prises[c]) || "rouge";
+  conteneur.replaceChildren(...Object.entries(COULEURS).flatMap(([cle, nom]) => {
+    const id = nomGroupe + "-" + cle;
+    const input = el("input", { type: "radio", name: nomGroupe, id, value: cle });
+    if (cle === valeur) input.checked = true;
+    const qui = prises[cle] ? prises[cle].slice(0, 2).join("") : "";
+    const label = el("label", { for: id, title: nom + (qui ? " (déjà prise)" : ""), "aria-label": nom + (qui ? ", déjà prise" : "") }, el("span", {}, qui));
+    label.style.setProperty("--c", "var(--p-" + cle + ")");
+    return [input, label];
+  }));
+  return () => { const c = conteneur.querySelector("input:checked"); return c ? c.value : valeur; };
 }
 function avatarEl(p, taille = "", photoForcee = null) {
   const a = el("span", { class: "avatar " + taille, "aria-hidden": "true" });
@@ -820,8 +861,8 @@ function avatarEl(p, taille = "", photoForcee = null) {
     a.append(el("img", { src, alt: "", loading: "lazy" }));
   } else {
     a.textContent = ((p && p.prenom) || "?").charAt(0);
-    a.style.setProperty("--av", couleurDe((p && p.id) || "x"));
   }
+  a.style.setProperty("--av", couleurDe(p));
   return a;
 }
 
@@ -1048,7 +1089,7 @@ function ongletsDe(p) {
 function majEntete() {
   $("session").hidden = !moi;
   if (!moi) return;
-  $("session-avatar").replaceChildren(avatarEl(moi, "mini"));
+  $("session-avatar").replaceChildren(avatarEl(moi, "petit"));
   $("session-nom").textContent = moi.prenom;
 }
 
@@ -1098,6 +1139,7 @@ async function afficherChoix() {
   let profils;
   try { profils = await donnees.tousLesProfils(); }
   catch (e) { return chargement(messageErreur(e), afficherChoix); }
+  profilsConnus = profils;
 
   const dernier = lire("couloir-dernier");
   const tuiles = profils.map((p) => {
@@ -1115,6 +1157,7 @@ async function afficherChoix() {
   ]);
   ajout.addEventListener("click", () => {
     $("form-creation").reset();
+    lireCouleurCreation = choixCouleur($("couleurs-creation"), "couleur-creation", null, null);
     afficherMessage("erreur-creation", "");
     montrer("ecran-creation");
   });
@@ -1123,9 +1166,13 @@ async function afficherChoix() {
   montrer("ecran-choix");
 }
 
+let lireCouleurCreation = null;
 $("form-creation").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const champs = { prenom: $("prenom").value.trim(), nom: $("nom").value.trim() || null, discipline: $("discipline").value };
+  const champs = {
+    prenom: $("prenom").value.trim(), nom: $("nom").value.trim() || null,
+    discipline: $("discipline").value, couleur: lireCouleurCreation ? lireCouleurCreation() : null,
+  };
   if (!champs.prenom) return afficherMessage("erreur-creation", "Indique ton prénom.");
   try {
     const profil = await pendant($("bouton-creation"), "Création…", () => donnees.creerProfil(champs));
@@ -1147,7 +1194,7 @@ function carteFil(s) {
   const quoi = !s.coach_id ? "a publié une séance"
     : s.coach_id === auteur.id ? "a fait sa séance prévue"
     : "a fait la séance de " + nomComplet(s.coach);
-  const carte = el("article", { class: "seance" }, [
+  const carte = el("article", { class: "seance post" }, [
     el("div", { class: "post-tete" }, [
       avatarEl(auteur, "petit"),
       el("div", { class: "post-qui" }, [
@@ -1161,6 +1208,7 @@ function carteFil(s) {
     etatEffort(s),
     s.commentaire ? el("blockquote", { class: "commentaire" }, s.commentaire) : null,
   ]);
+  carte.style.setProperty("--auteur", couleurDe(auteur));
   // On peut supprimer ses propres publications libres
   if (!s.coach_id && moi && auteur.id === moi.id) {
     const b = el("button", { type: "button", class: "lien petit", style: "justify-self:start" }, "Supprimer ma publication");
@@ -1946,6 +1994,7 @@ function afficherMesTrophees(stats) {
   }));
 }
 
+let lireCouleurPf = null;
 function majCompteur() { $("pf-compteur").textContent = $("pf-description").value.length + " / 300"; }
 
 $("profil-modifier").addEventListener("click", () => {
@@ -1957,6 +2006,7 @@ $("profil-modifier").addEventListener("click", () => {
   $("pf-nom").value = moi.nom || "";
   $("pf-discipline").value = moi.discipline || DISCIPLINES[0];
   $("pf-description").value = moi.description || "";
+  lireCouleurPf = choixCouleur($("couleurs-pf"), "couleur-pf", cleCouleur(moi), moi.id);
   majCompteur();
   afficherMessage("erreur-pf", "");
   $("profil-vue").hidden = true;
@@ -1989,6 +2039,7 @@ $("profil-form").addEventListener("submit", async (event) => {
     prenom: $("pf-prenom").value.trim(),
     nom: $("pf-nom").value.trim() || null,
     discipline: $("pf-discipline").value,
+    couleur: lireCouleurPf ? lireCouleurPf() : cleCouleur(moi),
     description: $("pf-description").value.trim() || null,
   };
   if (!champs.prenom) return afficherMessage("erreur-pf", "Indique ton prénom.");
