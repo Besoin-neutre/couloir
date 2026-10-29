@@ -7,7 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Source+Sans+3:wght@400;600&display=swap">
 <style>
-/* Mise en page : une seule colonne centrée, comme un couloir de piste. */
+/* Mise en page : une seule colonne centrée, comme un couloir de piste,
+   avec une barre d'onglets en bas de l'écran comme dans une appli. */
 :root {
   --bg: #f3f5f7;          /* fond de page */
   --surface: #ffffff;     /* cartes */
@@ -17,7 +18,9 @@
   --track: #b8432f;       /* rouge tartan (couleur d'accent) */
   --track-ink: #ffffff;
   --coach: #2f5d8a;       /* bleu pour repérer les coachs */
-  --ok: #2d7a4b;          /* vert de confirmation */
+  --ok: #2d7a4b;          /* vert : fait / facile */
+  --moyen: #a86b12;       /* ambre : effort moyen */
+  --dur: #b8432f;         /* rouge : effort dur */
   --av1: #b8432f; --av2: #2f5d8a; --av3: #2d7a4b; --av4: #8a5a2f; --av5: #6b4f8f; /* couleurs des avatars */
   --display: "Barlow Condensed", "Arial Narrow", sans-serif;
   --body: "Source Sans 3", system-ui, sans-serif;
@@ -27,6 +30,7 @@
   :root {
     --bg: #11171d; --surface: #1a232c; --ink: #e8edf1; --muted: #9aa8b4;
     --line: #2d3a46; --track: #e0664f; --track-ink: #11171d; --coach: #7fb0de; --ok: #6cc28e;
+    --moyen: #e2a64a; --dur: #e0664f;
     --av1: #e0664f; --av2: #7fb0de; --av3: #6cc28e; --av4: #d9a066; --av5: #b39ddb;
     color-scheme: dark;
   }
@@ -43,9 +47,10 @@ body {
   line-height: 1.5;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: calc(32px + env(safe-area-inset-top, 0px)) calc(48px + env(safe-area-inset-bottom, 0px));
+  padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(48px + env(safe-area-inset-bottom, 0px));
 }
-.wrap { max-width: 520px; margin: 0 auto; display: grid; gap: 24px; }
+body.avec-nav { padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
+.wrap { max-width: 560px; margin: 0 auto; display: grid; gap: 20px; }
 
 /* En-tête avec les lignes de couloir */
 .top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
@@ -58,12 +63,12 @@ body {
   font-family: var(--display); font-weight: 700; font-size: 28px;
   letter-spacing: .04em; text-transform: uppercase; margin: 0;
 }
-.session { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+.session { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
 .session b { color: var(--ink); }
 
 .card {
   background: var(--surface); border: 1px solid var(--line);
-  border-radius: 10px; padding: 24px; display: grid; gap: 18px;
+  border-radius: 10px; padding: 20px; display: grid; gap: 16px; min-width: 0;
 }
 h2 {
   font-family: var(--display); font-weight: 500; font-size: 30px;
@@ -75,10 +80,10 @@ h3 {
 }
 .intro { color: var(--muted); margin: -8px 0 0; }
 .muted { color: var(--muted); margin: 0; }
+.petit { font-size: 14px; }
 
 /* Formulaires */
 form { display: grid; gap: 16px; }
-.groupe { display: grid; gap: 16px; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 @media (max-width: 420px) { .row { grid-template-columns: 1fr; } }
 .field { display: grid; gap: 6px; min-width: 0; }
@@ -87,72 +92,155 @@ input, select, textarea {
   font: inherit; color: var(--ink); background: var(--bg);
   border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; width: 100%;
 }
-textarea { min-height: 150px; resize: vertical; line-height: 1.45; }
-input:focus, select:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--track); outline-offset: 2px; }
+textarea { min-height: 96px; resize: vertical; line-height: 1.45; }
+textarea.grand { min-height: 150px; }
+input:focus, select:focus, textarea:focus, button:focus-visible, .bouton-fichier:focus-within { outline: 2px solid var(--track); outline-offset: 2px; }
 .aide { font-size: 13px; color: var(--muted); margin: 0; }
 .error { color: var(--track); font-size: 14px; margin: 0; }
 .ok { color: var(--ok); font-size: 14px; font-weight: 600; margin: 0; }
+fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; min-width: 0; }
+legend { padding: 0; margin-bottom: 6px; }
+.visuellement-cache { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
 
 /* Boutons */
-button {
+button, .bouton-fichier {
   font: inherit; font-weight: 600; cursor: pointer; border-radius: 6px; padding: 12px 16px;
   border: 1px solid var(--track); background: var(--track); color: var(--track-ink);
 }
 button[disabled] { opacity: .6; cursor: wait; }
-button.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+button.ghost, .bouton-fichier { background: transparent; color: var(--ink); border-color: var(--line); }
+.bouton-fichier { display: inline-block; text-transform: none; letter-spacing: 0; font-size: 16px; position: relative; }
+button.compact { padding: 8px 12px; font-size: 15px; }
 button.lien {
   background: none; border: 0; padding: 0; color: var(--track); font-weight: 600;
   text-decoration: underline; text-underline-offset: 3px;
 }
-.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 
 /* Badges de rôle */
 .badge {
   flex: none; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
-  padding: 3px 8px; border-radius: 99px; border: 1px solid var(--track); color: var(--track);
+  padding: 2px 8px; border-radius: 99px; border: 1px solid var(--track); color: var(--track);
 }
 .badge.coach { border-color: var(--coach); color: var(--coach); }
 
-/* Choix du profil, façon Netflix */
+/* Avatars (initiale colorée ou photo) */
+.avatar {
+  flex: none; width: 84px; height: 84px; border-radius: 14px; display: grid; place-items: center;
+  font-family: var(--display); font-weight: 700; font-size: 42px; text-transform: uppercase;
+  background: var(--av, var(--track)); color: var(--surface);
+  border: 3px solid transparent; overflow: hidden;
+}
+.avatar.photo { background: var(--line); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.avatar.grand { width: 96px; height: 96px; font-size: 48px; border-radius: 16px; border-width: 0; }
+.avatar.petit { width: 40px; height: 40px; font-size: 20px; border-radius: 10px; border-width: 0; }
+.avatar.mini { width: 26px; height: 26px; font-size: 14px; border-radius: 7px; border-width: 0; }
+
+/* Page d'accueil « Qui es-tu ? », façon Netflix */
 .grille { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 18px 12px; }
 .tuile-wrap { position: relative; min-width: 0; }
 .tuile {
   width: 100%; display: grid; justify-items: center; gap: 8px; padding: 6px;
   background: transparent; border: 0; color: var(--ink); font-weight: 400;
 }
-.avatar {
-  width: 84px; height: 84px; border-radius: 14px; display: grid; place-items: center;
-  font-family: var(--display); font-weight: 700; font-size: 42px; text-transform: uppercase;
-  background: var(--av, var(--track)); color: var(--surface);
-  border: 3px solid transparent; transition: border-color .15s, transform .15s;
-}
-.tuile:hover .avatar, .tuile:focus-visible .avatar { border-color: var(--ink); }
+.tuile .avatar { transition: border-color .15s, transform .15s; }
+.tuile:hover .avatar, .tuile:focus-visible .avatar, .tuile.actif .avatar { border-color: var(--ink); }
 @media (prefers-reduced-motion: no-preference) { .tuile:hover .avatar { transform: scale(1.05); } }
-.tuile.actif .avatar { border-color: var(--ink); }
 .tuile.ajout .avatar { background: transparent; border: 2px dashed var(--line); color: var(--muted); }
 .tuile-nom { font-weight: 600; text-align: center; overflow-wrap: anywhere; line-height: 1.2; }
 .tuile .badge { font-size: 11px; }
 
-/* Écrans d'accueil */
-.hello { font-family: var(--display); font-weight: 700; font-size: 44px; line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: .02em; overflow-wrap: anywhere; }
-.hello em { font-style: normal; color: var(--track); }
-.hello.coach em { color: var(--coach); }
-dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; }
-dt { color: var(--muted); font-size: 14px; }
-dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.entete-liste { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+/* Barre d'onglets en bas */
+.nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  background: var(--surface); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.nav-int { max-width: 560px; margin: 0 auto; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.nav button {
+  background: none; border: 0; border-radius: 0; color: var(--muted);
+  display: grid; justify-items: center; gap: 2px; padding: 10px 4px 12px;
+  font-size: 12px; letter-spacing: .05em; text-transform: uppercase;
+}
+.nav button svg { width: 24px; height: 24px; }
+.nav button[aria-current="page"] { color: var(--track); }
+.panneau { display: grid; gap: 16px; min-width: 0; }
+.entete-panneau { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
 
-/* Séances */
-.seances { display: grid; gap: 12px; }
-.seance { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 6px; background: var(--bg); }
+/* Séances (cartes) */
+.seances, .fil { display: grid; gap: 12px; }
+.seance { border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 8px; background: var(--surface); min-width: 0; }
+.seance.faite { border-left: 4px solid var(--ok); }
 .seance-date { font-size: 13px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--track); }
-.seance-titre { font-weight: 600; font-size: 18px; margin: 0; }
+.seance-titre { font-weight: 600; font-size: 18px; margin: 0; overflow-wrap: anywhere; }
 .seance-contenu { white-space: pre-line; margin: 0; overflow-wrap: anywhere; }
-.seance-pied { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
 .vide { border: 1px dashed var(--line); border-radius: 8px; padding: 16px; color: var(--muted); margin: 0; }
+.etat { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pill { font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+.pill.faite { border-color: var(--ok); color: var(--ok); }
+.rpe-badge { font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 99px; color: var(--surface); font-variant-numeric: tabular-nums; }
+.rpe-badge.facile { background: var(--ok); }
+.rpe-badge.moyen { background: var(--moyen); }
+.rpe-badge.dur { background: var(--dur); }
+.commentaire {
+  margin: 0; padding: 4px 0 4px 12px; border-left: 3px solid var(--line);
+  color: var(--ink); white-space: pre-line; overflow-wrap: anywhere; font-style: italic;
+}
+.ressenti-zone { display: grid; gap: 10px; border-top: 1px dashed var(--line); padding-top: 12px; }
+.form-ressenti { display: grid; gap: 14px; }
+
+/* Bouton « J'ai fait cette séance » */
+button.cocher {
+  justify-self: start; display: inline-flex; align-items: center; gap: 10px;
+  background: transparent; color: var(--ink); border-color: var(--line);
+}
+.case { width: 20px; height: 20px; border: 2px solid var(--ok); border-radius: 5px; }
+button.cocher:hover .case { background: var(--ok); }
+
+/* Échelle de difficulté 1 à 10 */
+.rpe-ligne { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; }
+.rpe-ligne input { position: absolute; opacity: 0; pointer-events: none; }
+.rpe-ligne label {
+  text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--ink); text-align: center;
+  border: 1px solid var(--line); border-radius: 6px; padding: 7px 0; cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.rpe-ligne input:focus-visible + label { outline: 2px solid var(--track); outline-offset: 2px; }
+.rpe-ligne input:checked + label.facile { background: var(--ok); border-color: var(--ok); color: var(--surface); }
+.rpe-ligne input:checked + label.moyen { background: var(--moyen); border-color: var(--moyen); color: var(--surface); }
+.rpe-ligne input:checked + label.dur { background: var(--dur); border-color: var(--dur); color: var(--surface); }
+
+/* Fil d'actualité */
+.post-tete { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.post-qui { min-width: 0; line-height: 1.3; }
+.post-qui b { overflow-wrap: anywhere; }
+
+/* Ma semaine */
+.semaine-nav { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; text-align: center; }
+.semaine-nav button { padding: 8px 14px; }
+.progression { display: grid; gap: 6px; }
+.barre { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.barre span { display: block; height: 100%; width: 0; background: var(--ok); border-radius: 99px; transition: width .3s; }
+
+/* Profil */
+.profil-tete { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.profil-tete > div { min-width: 0; display: grid; gap: 6px; }
+.profil-tete h2 { overflow-wrap: anywhere; }
+.profil-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.description { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+.stat { font-family: var(--display); font-size: 36px; font-weight: 700; line-height: 1; margin: 0; font-variant-numeric: tabular-nums; }
+.photo-ligne { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.photo-ligne > div { display: grid; gap: 6px; }
+
+/* Message d'accueil du coach */
+.hello { font-family: var(--display); font-weight: 700; font-size: 40px; line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: .02em; overflow-wrap: anywhere; }
+.hello em { font-style: normal; color: var(--coach); }
 
 @media (prefers-reduced-motion: no-preference) {
-  .card { animation: in .25s ease-out; }
+  .card, .seance { animation: in .25s ease-out; }
   @keyframes in { from { transform: translateY(6px); } to { transform: none; } }
 }
 </style>
@@ -167,28 +255,29 @@ dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
       <h1>Couloir</h1>
     </div>
     <div class="session" id="session" hidden>
-      <span id="session-nom"></span>
-      <button class="lien" type="button" id="changer-profil">Changer de profil</button>
+      <span id="session-avatar"></span>
+      <b id="session-nom"></b>
+      <button class="lien" type="button" id="changer-profil">Changer</button>
     </div>
   </div>
 
-  <!-- ÉCRAN 0 : chargement / erreur générale -->
+  <!-- ÉCRAN : chargement / erreur générale -->
   <section class="card" id="ecran-chargement">
     <p class="muted" id="message-chargement">Chargement…</p>
     <button type="button" class="ghost" id="reessayer" style="justify-self:start" hidden>Réessayer</button>
   </section>
 
-  <!-- ÉCRAN 1 : « Qui es-tu ? » — la page d'accueil -->
+  <!-- ÉCRAN : « Qui es-tu ? » — la page d'accueil -->
   <section class="card" id="ecran-choix" hidden>
     <h2>Qui es-tu ?</h2>
     <p class="intro">Touche ton profil pour l'ouvrir. Pas encore de profil ? Ajoute le tien.</p>
     <div class="grille" id="grille-profils"></div>
   </section>
 
-  <!-- ÉCRAN 2 : ajouter ou modifier un profil -->
-  <section class="card" id="ecran-profil" hidden>
-    <h2 id="titre-profil">Ajoute ton profil</h2>
-    <form id="form-profil" novalidate>
+  <!-- ÉCRAN : ajouter un nouveau profil -->
+  <section class="card" id="ecran-creation" hidden>
+    <h2>Ajoute ton profil</h2>
+    <form id="form-creation" novalidate>
       <div class="row">
         <div class="field">
           <label for="prenom">Prénom</label>
@@ -203,65 +292,176 @@ dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
         <label for="discipline">Discipline principale</label>
         <select id="discipline"></select>
       </div>
-      <p class="aide" id="info-role"></p>
-      <p class="error" id="erreur-profil" hidden></p>
+      <p class="aide">Tu pourras ajouter une photo et une description ensuite, dans l'onglet Profil.</p>
+      <p class="error" id="erreur-creation" hidden></p>
       <div class="actions">
-        <button type="submit" id="bouton-profil">Créer mon profil</button>
-        <button type="button" class="ghost" id="annuler-profil">Retour</button>
+        <button type="submit" id="bouton-creation">Créer mon profil</button>
+        <button type="button" class="ghost" id="annuler-creation">Retour</button>
       </div>
     </form>
   </section>
 
-  <!-- ÉCRAN 3 : espace athlète -->
-  <section class="card" id="ecran-athlete" hidden>
-    <p class="hello">Salut <em id="athlete-prenom"></em>&nbsp;!</p>
-    <dl>
-      <dt>Discipline</dt><dd id="athlete-discipline"></dd>
-    </dl>
-    <div class="entete-liste">
-      <h3>Mes séances</h3>
-      <button type="button" class="lien" id="actualiser">Actualiser</button>
+  <!-- ÉCRAN : l'appli, avec ses onglets -->
+  <section id="ecran-app" hidden>
+
+    <!-- ONGLET FIL -->
+    <div class="panneau" id="panneau-fil">
+      <div class="entete-panneau">
+        <h2>Le fil</h2>
+        <button type="button" class="compact" id="ouvrir-publier">Publier une séance</button>
+      </div>
+
+      <form class="card" id="form-publier" hidden novalidate>
+        <h3>Une séance faite de ton côté</h3>
+        <div class="row">
+          <div class="field">
+            <label for="pub-date">Date</label>
+            <input id="pub-date" type="date">
+          </div>
+          <div class="field">
+            <label for="pub-titre">Titre</label>
+            <input id="pub-titre" placeholder="Footing de récupération">
+          </div>
+        </div>
+        <div class="field">
+          <label for="pub-contenu">Contenu</label>
+          <textarea id="pub-contenu" placeholder="45 min en endurance fondamentale + 5 lignes droites"></textarea>
+        </div>
+        <div id="pub-ressenti"></div>
+        <div class="field">
+          <label for="pub-commentaire">Ton ressenti</label>
+          <textarea id="pub-commentaire" placeholder="Bonnes sensations, jambes un peu lourdes au début…"></textarea>
+        </div>
+        <p class="error" id="erreur-publier" hidden></p>
+        <div class="actions">
+          <button type="submit" id="bouton-publier">Publier</button>
+          <button type="button" class="ghost" id="annuler-publier">Annuler</button>
+        </div>
+      </form>
+
+      <div class="fil" id="fil-liste"></div>
+      <button type="button" class="ghost" id="fil-plus" style="justify-self:center" hidden>Voir les séances plus anciennes</button>
     </div>
-    <div class="seances" id="athlete-seances"></div>
-    <button class="ghost" type="button" id="modifier-athlete" style="justify-self:start">Modifier mon profil</button>
-  </section>
 
-  <!-- ÉCRAN 4 : espace coach -->
-  <section class="card" id="ecran-coach" hidden>
-    <p class="hello coach">Salut <em id="coach-prenom"></em>&nbsp;!</p>
-    <p class="muted">Choisis un athlète et écris-lui sa séance.</p>
-
-    <p class="vide" id="coach-aucun" hidden>Aucun athlète inscrit pour l'instant. Dès qu'un athlète aura ajouté son profil, il apparaîtra ici.</p>
-
-    <form id="form-seance" novalidate>
-      <div class="field">
-        <label for="choix-athlete">Athlète</label>
-        <select id="choix-athlete"></select>
+    <!-- ONGLET MA SEMAINE (athlète) -->
+    <div class="panneau" id="panneau-semaine" hidden>
+      <div class="semaine-nav">
+        <button type="button" class="ghost" id="sem-prec" aria-label="Semaine précédente">←</button>
+        <div>
+          <h2 id="sem-titre">Cette semaine</h2>
+          <p class="muted petit" id="sem-dates"></p>
+        </div>
+        <button type="button" class="ghost" id="sem-suiv" aria-label="Semaine suivante">→</button>
       </div>
-      <div class="row">
-        <div class="field">
-          <label for="seance-date">Date</label>
-          <input id="seance-date" type="date">
+      <div class="progression" id="sem-progression" hidden>
+        <div class="barre"><span id="sem-barre"></span></div>
+        <p class="muted petit" id="sem-compte"></p>
+      </div>
+      <div class="seances" id="sem-liste"></div>
+    </div>
+
+    <!-- ONGLET PLANIFIER (coach) -->
+    <div class="panneau" id="panneau-planifier" hidden>
+      <section class="card">
+        <p class="hello">Salut <em id="coach-prenom"></em>&nbsp;!</p>
+        <p class="muted">Choisis un athlète et écris-lui sa séance.</p>
+        <p class="vide" id="coach-aucun" hidden>Aucun athlète inscrit pour l'instant. Dès qu'un athlète aura ajouté son profil, il apparaîtra ici.</p>
+
+        <form id="form-seance" novalidate>
+          <div class="field">
+            <label for="choix-athlete">Athlète</label>
+            <select id="choix-athlete"></select>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="seance-date">Date</label>
+              <input id="seance-date" type="date">
+            </div>
+            <div class="field">
+              <label for="seance-titre">Titre</label>
+              <input id="seance-titre" placeholder="Fractionné 400 m">
+            </div>
+          </div>
+          <div class="field">
+            <label for="seance-contenu">Contenu de la séance</label>
+            <textarea id="seance-contenu" class="grand" placeholder="Échauffement : 20 min footing + gammes&#10;Corps de séance : 2 × (5 × 400 m), r = 1 min, R = 4 min&#10;Retour au calme : 10 min footing + étirements"></textarea>
+          </div>
+          <p class="error" id="erreur-seance" hidden></p>
+          <p class="ok" id="ok-seance" hidden></p>
+          <button type="submit" id="bouton-seance" style="justify-self:start">Envoyer la séance</button>
+        </form>
+      </section>
+
+      <h3 id="coach-titre-liste">Séances envoyées</h3>
+      <div class="seances" id="coach-seances"></div>
+    </div>
+
+    <!-- ONGLET PROFIL -->
+    <div class="panneau" id="panneau-profil" hidden>
+      <section class="card" id="profil-vue">
+        <div class="profil-tete">
+          <span id="profil-avatar"></span>
+          <div>
+            <h2 id="profil-nom"></h2>
+            <div class="profil-meta">
+              <span class="badge" id="profil-badge"></span>
+              <span class="muted petit" id="profil-discipline"></span>
+            </div>
+          </div>
+        </div>
+        <p class="description" id="profil-description"></p>
+        <div>
+          <p class="stat" id="profil-stat">–</p>
+          <p class="muted petit">séances faites</p>
+        </div>
+        <button type="button" class="ghost" id="profil-modifier" style="justify-self:start">Modifier mon profil</button>
+      </section>
+
+      <form class="card" id="profil-form" hidden novalidate>
+        <h3>Modifier mon profil</h3>
+        <div class="photo-ligne">
+          <span id="photo-apercu"></span>
+          <div>
+            <label class="bouton-fichier">Choisir une photo
+              <input type="file" id="photo" accept="image/*" class="visuellement-cache">
+            </label>
+            <p class="aide">Elle sera recadrée en carré.</p>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="pf-prenom">Prénom</label>
+            <input id="pf-prenom" autocomplete="given-name">
+          </div>
+          <div class="field">
+            <label for="pf-nom">Nom</label>
+            <input id="pf-nom" autocomplete="family-name">
+          </div>
         </div>
         <div class="field">
-          <label for="seance-titre">Titre</label>
-          <input id="seance-titre" placeholder="Fractionné 400 m">
+          <label for="pf-discipline">Discipline principale</label>
+          <select id="pf-discipline"></select>
         </div>
-      </div>
-      <div class="field">
-        <label for="seance-contenu">Contenu de la séance</label>
-        <textarea id="seance-contenu" placeholder="Échauffement : 20 min footing + gammes&#10;Corps de séance : 2 × (5 × 400 m), r = 1 min, R = 4 min&#10;Retour au calme : 10 min footing + étirements"></textarea>
-      </div>
-      <p class="error" id="erreur-seance" hidden></p>
-      <p class="ok" id="ok-seance" hidden></p>
-      <button type="submit" id="bouton-seance" style="justify-self:start">Envoyer la séance</button>
-    </form>
-
-    <h3 id="coach-titre-liste">Séances envoyées</h3>
-    <div class="seances" id="coach-seances"></div>
-    <button class="ghost" type="button" id="modifier-coach" style="justify-self:start">Modifier mon profil</button>
+        <div class="field">
+          <label for="pf-description">Description</label>
+          <textarea id="pf-description" maxlength="300" placeholder="Objectifs de la saison, records, ce que tu aimes courir…"></textarea>
+          <p class="aide" id="pf-compteur">0 / 300</p>
+        </div>
+        <p class="aide" id="pf-role"></p>
+        <p class="error" id="erreur-pf" hidden></p>
+        <div class="actions">
+          <button type="submit" id="bouton-pf">Enregistrer</button>
+          <button type="button" class="ghost" id="annuler-pf">Annuler</button>
+        </div>
+      </form>
+    </div>
   </section>
 </div>
+
+<!-- Barre d'onglets (remplie selon le rôle) -->
+<nav class="nav" id="nav" aria-label="Onglets" hidden>
+  <div class="nav-int" id="nav-int"></div>
+</nav>
 
 <script>
 /* =========================================================
@@ -283,32 +483,30 @@ if (!window.supabase) {
   $("message-chargement").textContent = "Le site n'a pas pu charger ses outils. Vérifie ta connexion Internet, puis recharge la page.";
   throw new Error("Bibliothèque Supabase introuvable");
 }
-// Plus de comptes ni de mots de passe : le site n'ouvre aucune session.
+// Pas de comptes ni de mots de passe : le site n'ouvre aucune session.
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-// Ménage : on efface ce que les anciennes versions avaient rangé dans le navigateur
-try {
-  localStorage.removeItem("couloir-comptes");
-  Object.keys(localStorage).filter((k) => k.startsWith("sb-")).forEach((k) => localStorage.removeItem(k));
-} catch (e) {}
-
 /* =========================================================
    2. LES DONNÉES : toutes les lectures et écritures dans la base
    ========================================================= */
-// Petite aide : si Supabase renvoie une erreur, on la « lance » pour l'afficher
 function verifier({ data, error }) { if (error) throw error; return data; }
 
+const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url";
+const CHAMPS_SEANCE = "id, date, titre, contenu, fait, fait_le, ressenti, commentaire, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
+const CHAMPS_FIL = CHAMPS_SEANCE + ", athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url)";
+
 const donnees = {
+  // Profils
   async tousLesProfils() {
-    return verifier(await sb.from("profils").select("id, prenom, nom, role, discipline").order("prenom"));
+    return verifier(await sb.from("profils").select(CHAMPS_PROFIL).order("prenom"));
   },
   async profil(id) {
-    return verifier(await sb.from("profils").select("id, prenom, nom, role, discipline").eq("id", id).maybeSingle());
+    return verifier(await sb.from("profils").select(CHAMPS_PROFIL).eq("id", id).maybeSingle());
   },
   async creerProfil(p) {
-    return verifier(await sb.from("profils").insert(p).select("id, prenom, nom, role, discipline").single());
+    return verifier(await sb.from("profils").insert(p).select(CHAMPS_PROFIL).single());
   },
   async modifierProfil(id, champs) {
     verifier(await sb.from("profils").update(champs).eq("id", id));
@@ -316,18 +514,39 @@ const donnees = {
   async athletes() {
     return verifier(await sb.from("profils").select("id, prenom, nom, discipline").eq("role", "Athlète").order("prenom"));
   },
-  async seancesDe(athleteId) {
-    return verifier(await sb.from("seances")
-      .select("id, date, titre, contenu, coach:profils!seances_coach_id_fkey(prenom, nom)")
-      .eq("athlete_id", athleteId)
-      .order("date", { ascending: true }));
+  async nbSeancesFaites(id) {
+    const { count, error } = await sb.from("seances").select("id", { count: "exact", head: true }).eq("athlete_id", id).eq("fait", true);
+    if (error) throw error;
+    return count || 0;
   },
-  async envoyerSeance(s) {
-    verifier(await sb.from("seances").insert(s));
+  // Photo de profil : rangée dans le dossier « photos » de Supabase
+  async envoyerPhoto(profilId, blob) {
+    const chemin = profilId + "/" + Date.now() + ".jpg";
+    verifier(await sb.storage.from("photos").upload(chemin, blob, { contentType: "image/jpeg" }));
+    return sb.storage.from("photos").getPublicUrl(chemin).data.publicUrl;
   },
-  async supprimerSeance(id) {
-    verifier(await sb.from("seances").delete().eq("id", id));
+
+  // Séances
+  async fil(de, a) {
+    return verifier(await sb.from("seances").select(CHAMPS_FIL)
+      .eq("fait", true).order("fait_le", { ascending: false }).range(de, a));
   },
+  async semaine(athleteId, debut, fin) {
+    return verifier(await sb.from("seances").select(CHAMPS_SEANCE)
+      .eq("athlete_id", athleteId).not("coach_id", "is", null)
+      .gte("date", debut).lte("date", fin).order("date"));
+  },
+  async sansDate(athleteId) {
+    return verifier(await sb.from("seances").select(CHAMPS_SEANCE)
+      .eq("athlete_id", athleteId).not("coach_id", "is", null).is("date", null).eq("fait", false));
+  },
+  async seancesDuCoachPour(athleteId) {
+    return verifier(await sb.from("seances").select(CHAMPS_SEANCE)
+      .eq("athlete_id", athleteId).not("coach_id", "is", null).order("date", { ascending: false }));
+  },
+  async envoyerSeance(s) { verifier(await sb.from("seances").insert(s)); },
+  async majSeance(id, champs) { verifier(await sb.from("seances").update(champs).eq("id", id)); },
+  async supprimerSeance(id) { verifier(await sb.from("seances").delete().eq("id", id)); },
 };
 
 /* =========================================================
@@ -343,12 +562,24 @@ function el(balise, attributs = {}, enfants = []) {
 function isoLocal(d) {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
+function aujourdhui() { return isoLocal(new Date()); }
 function demain() { const d = new Date(); d.setDate(d.getDate() + 1); return isoLocal(d); }
 // « 2026-10-30 » devient « vendredi 30 octobre »
 function formatDate(iso) {
-  if (!iso) return "Date à préciser";
+  if (!iso) return "Quand tu veux";
   const [a, m, j] = iso.split("-").map(Number);
   return new Date(a, m - 1, j).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+}
+// « il y a 3 heures », « hier »…
+function ilYa(iso) {
+  if (!iso) return "";
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  const rtf = new Intl.RelativeTimeFormat("fr", { numeric: "auto" });
+  if (s < 60) return "à l'instant";
+  if (s < 3600) return rtf.format(-Math.round(s / 60), "minute");
+  if (s < 86400) return rtf.format(-Math.round(s / 3600), "hour");
+  if (s < 86400 * 7) return rtf.format(-Math.round(s / 86400), "day");
+  return "le " + new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 }
 function nomComplet(p) { return p ? (p.prenom + " " + (p.nom || "")).trim() : "Coach"; }
 
@@ -356,17 +587,18 @@ function remplirDisciplines(select) {
   select.replaceChildren(...DISCIPLINES.map((d) => el("option", {}, d)));
 }
 remplirDisciplines($("discipline"));
+remplirDisciplines($("pf-discipline"));
 
-// Traduit les messages d'erreur de Supabase en français clair
 function messageErreur(e) {
   const m = (e && (e.message || e.error_description)) || String(e);
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Impossible de joindre le serveur. Vérifie ta connexion Internet.";
-  if (/row-level security|permission denied/i.test(m)) return "Action refusée par les règles de la base de données.";
+  if (/row-level security|permission denied|Unauthorized/i.test(m)) return "Action refusée par les règles de la base de données.";
+  if (/column .* does not exist|Could not find/i.test(m)) return "La base de données n'est pas à jour : lance le dernier code SQL dans Supabase.";
+  if (/Bucket not found/i.test(m)) return "Le dossier des photos n'existe pas encore : lance le dernier code SQL dans Supabase.";
   return "Une erreur est survenue : " + m;
 }
 function afficherMessage(id, texte) { const p = $(id); p.textContent = texte || ""; p.hidden = !texte; }
 
-// Désactive un bouton pendant qu'on attend la réponse du serveur
 async function pendant(bouton, texteAttente, action) {
   const texte = bouton.textContent;
   bouton.disabled = true; bouton.textContent = texteAttente;
@@ -374,14 +606,74 @@ async function pendant(bouton, texteAttente, action) {
   finally { bouton.disabled = false; bouton.textContent = texte; }
 }
 
+// Avatar : la photo si elle existe, sinon l'initiale sur une couleur
+const COULEURS = ["--av1", "--av2", "--av3", "--av4", "--av5"];
+function couleurDe(id) {
+  let n = 0;
+  for (const c of String(id)) n = (n * 31 + c.charCodeAt(0)) % 997;
+  return "var(" + COULEURS[n % COULEURS.length] + ")";
+}
+function avatarEl(p, taille = "", photoForcee = null) {
+  const a = el("span", { class: "avatar " + taille, "aria-hidden": "true" });
+  const src = photoForcee || (p && p.photo_url);
+  if (src) {
+    a.classList.add("photo");
+    a.append(el("img", { src, alt: "", loading: "lazy" }));
+  } else {
+    a.textContent = ((p && p.prenom) || "?").charAt(0);
+    a.style.setProperty("--av", couleurDe((p && p.id) || "x"));
+  }
+  return a;
+}
+
+// Difficulté ressentie (échelle de 1 à 10)
+function niveau(n) { return n <= 4 ? "facile" : n <= 7 ? "moyen" : "dur"; }
+function badgeRessenti(n) {
+  return el("span", { class: "rpe-badge " + niveau(n) }, "Difficulté " + n + "/10");
+}
+function choixRessenti(prefixe, valeur) {
+  const fs = el("fieldset", {}, el("legend", { class: "label" }, "Difficulté ressentie"));
+  const ligne = el("div", { class: "rpe-ligne" });
+  for (let n = 1; n <= 10; n++) {
+    const id = prefixe + "-" + n;
+    const input = el("input", { type: "radio", name: prefixe, id, value: String(n) });
+    if (n === valeur) input.checked = true;
+    ligne.append(input, el("label", { for: id, class: niveau(n) }, String(n)));
+  }
+  fs.append(ligne, el("p", { class: "aide" }, "1 = très facile · 10 = effort maximal"));
+  fs.valeur = () => { const c = fs.querySelector("input:checked"); return c ? Number(c.value) : null; };
+  return fs;
+}
+
+// Réduit une photo en carré de 320 px (plus légère à envoyer et à afficher)
+async function preparerPhoto(fichier) {
+  const url = URL.createObjectURL(fichier);
+  try {
+    const img = await new Promise((ok, ko) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = () => ko(new Error("Cette image ne peut pas être lue. Essaie une photo en JPEG ou PNG."));
+      i.src = url;
+    });
+    const cote = Math.min(img.naturalWidth, img.naturalHeight);
+    const c = document.createElement("canvas");
+    c.width = c.height = 320;
+    c.getContext("2d").drawImage(img, (img.naturalWidth - cote) / 2, (img.naturalHeight - cote) / 2, cote, cote, 0, 0, 320, 320);
+    return await new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.85));
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 // N'affiche qu'un seul écran à la fois
-const ECRANS = ["ecran-chargement", "ecran-choix", "ecran-profil", "ecran-athlete", "ecran-coach"];
+const ECRANS = ["ecran-chargement", "ecran-choix", "ecran-creation", "ecran-app"];
 function montrer(id) {
   ECRANS.forEach((e) => ($(e).hidden = e !== id));
+  $("nav").hidden = id !== "ecran-app";
+  document.body.classList.toggle("avec-nav", id === "ecran-app");
   window.scrollTo(0, 0);
 }
 
-// Écran d'attente ou d'erreur, avec un bouton « Réessayer » si besoin
 let actionReessayer = null;
 function chargement(texte, erreurAction) {
   $("message-chargement").textContent = texte;
@@ -392,22 +684,60 @@ function chargement(texte, erreurAction) {
 $("reessayer").addEventListener("click", () => actionReessayer && actionReessayer());
 
 /* =========================================================
-   4. LE PROFIL OUVERT
-   Le navigateur retient seulement le dernier profil choisi,
-   pour le mettre en avant dans la grille.
+   4. LE PROFIL OUVERT ET LES ONGLETS
    ========================================================= */
 let moi = null;
+let onglet = "fil";
 
-function retenirDernier(id) { try { localStorage.setItem("couloir-dernier", id); } catch (e) {} }
-function dernierProfil() { try { return localStorage.getItem("couloir-dernier"); } catch (e) { return null; } }
+function lire(cle) { try { return localStorage.getItem(cle); } catch (e) { return null; } }
+function ecrire(cle, v) { try { localStorage.setItem(cle, v); } catch (e) {} }
+
+const ICONES = {
+  fil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',
+  semaine: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M9 15l2 2 4-4"/></svg>',
+  planifier: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M12 13v5M9.5 15.5h5"/></svg>',
+  profil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.2-3.5 4-5 7-5s5.8 1.5 7 5"/></svg>',
+};
+const NOMS_ONGLETS = { fil: "Fil", semaine: "Ma semaine", planifier: "Planifier", profil: "Profil" };
+function ongletsDe(p) { return p.role === "Coach" ? ["fil", "planifier", "profil"] : ["fil", "semaine", "profil"]; }
+
+function majEntete() {
+  $("session").hidden = !moi;
+  if (!moi) return;
+  $("session-avatar").replaceChildren(avatarEl(moi, "mini"));
+  $("session-nom").textContent = moi.prenom;
+}
 
 function ouvrirProfil(profil) {
   moi = profil;
-  retenirDernier(profil.id);
-  $("session").hidden = false;
-  $("session-nom").replaceChildren(el("b", {}, moi.prenom), " · " + moi.role);
-  if (moi.role === "Coach") afficherCoach();
-  else afficherAthlete();
+  ecrire("couloir-dernier", profil.id);
+  majEntete();
+
+  const liste = ongletsDe(moi);
+  $("nav-int").replaceChildren(...liste.map((o) => {
+    const b = el("button", { type: "button", "data-onglet": o });
+    b.innerHTML = ICONES[o];
+    b.append(el("span", {}, NOMS_ONGLETS[o]));
+    b.addEventListener("click", () => aller(o));
+    return b;
+  }));
+  montrer("ecran-app");
+  const memorise = lire("couloir-onglet");
+  aller(liste.includes(memorise) ? memorise : "fil");
+}
+
+function aller(o) {
+  onglet = o;
+  ecrire("couloir-onglet", o);
+  ["fil", "semaine", "planifier", "profil"].forEach((p) => ($("panneau-" + p).hidden = p !== o));
+  $("nav-int").querySelectorAll("button").forEach((b) => {
+    if (b.dataset.onglet === o) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
+  window.scrollTo(0, 0);
+  if (o === "fil") chargerFil(true);
+  if (o === "semaine") chargerSemaine();
+  if (o === "planifier") afficherPlanifier();
+  if (o === "profil") afficherProfil();
 }
 
 $("changer-profil").addEventListener("click", () => afficherChoix());
@@ -415,31 +745,19 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
 /* =========================================================
    5. PAGE D'ACCUEIL « QUI ES-TU ? »
    ========================================================= */
-const COULEURS = ["--av1", "--av2", "--av3", "--av4", "--av5"];
-function couleurDe(id) {
-  let n = 0;
-  for (const c of id) n = (n * 31 + c.charCodeAt(0)) % 997;
-  return "var(" + COULEURS[n % COULEURS.length] + ")";
-}
-
 async function afficherChoix() {
   moi = null;
-  $("session").hidden = true;
+  majEntete();
   chargement("Chargement des profils…");
 
   let profils;
-  try {
-    profils = await donnees.tousLesProfils();
-  } catch (e) {
-    return chargement(messageErreur(e), afficherChoix);
-  }
+  try { profils = await donnees.tousLesProfils(); }
+  catch (e) { return chargement(messageErreur(e), afficherChoix); }
 
-  const dernier = dernierProfil();
+  const dernier = lire("couloir-dernier");
   const tuiles = profils.map((p) => {
-    const avatar = el("span", { class: "avatar", "aria-hidden": "true" }, p.prenom.charAt(0));
-    avatar.style.setProperty("--av", couleurDe(p.id));
     const bouton = el("button", { type: "button", class: "tuile" + (p.id === dernier ? " actif" : "") }, [
-      avatar,
+      avatarEl(p),
       el("span", { class: "tuile-nom" }, nomComplet(p)),
       el("span", { class: "badge" + (p.role === "Coach" ? " coach" : "") }, p.role),
     ]);
@@ -451,116 +769,269 @@ async function afficherChoix() {
     el("span", { class: "avatar", "aria-hidden": "true" }, "+"),
     el("span", { class: "tuile-nom" }, "Ajouter mon profil"),
   ]);
-  ajout.addEventListener("click", () => ouvrirFormulaireProfil(null));
+  ajout.addEventListener("click", () => {
+    $("form-creation").reset();
+    afficherMessage("erreur-creation", "");
+    montrer("ecran-creation");
+  });
 
   $("grille-profils").replaceChildren(...tuiles, el("div", { class: "tuile-wrap" }, ajout));
   montrer("ecran-choix");
 }
 
-/* =========================================================
-   6. FORMULAIRE DE PROFIL (ajout ou modification)
-   ========================================================= */
-let profilEnModification = null; // null = ajout d'un nouveau profil
-
-function ouvrirFormulaireProfil(profil) {
-  profilEnModification = profil;
-  afficherMessage("erreur-profil", "");
-  $("titre-profil").textContent = profil ? "Modifier mon profil" : "Ajoute ton profil";
-  $("bouton-profil").textContent = profil ? "Enregistrer" : "Créer mon profil";
-  $("prenom").value = profil?.prenom || "";
-  $("nom").value = profil?.nom || "";
-  $("discipline").value = profil?.discipline || DISCIPLINES[0];
-  $("info-role").textContent = profil && profil.role === "Coach"
-    ? "Ton rôle : Coach."
-    : "Ton rôle : Athlète. Le rôle Coach est attribué par l'administratrice du site.";
-  montrer("ecran-profil");
-}
-
-$("form-profil").addEventListener("submit", async (event) => {
+$("form-creation").addEventListener("submit", async (event) => {
   event.preventDefault();
   const champs = { prenom: $("prenom").value.trim(), nom: $("nom").value.trim() || null, discipline: $("discipline").value };
-  if (!champs.prenom) return afficherMessage("erreur-profil", "Indique ton prénom.");
+  if (!champs.prenom) return afficherMessage("erreur-creation", "Indique ton prénom.");
   try {
-    let profil;
-    await pendant($("bouton-profil"), "Enregistrement…", async () => {
-      if (profilEnModification) {
-        await donnees.modifierProfil(profilEnModification.id, champs);
-        profil = await donnees.profil(profilEnModification.id);
-      } else {
-        profil = await donnees.creerProfil(champs);
-      }
-    });
+    const profil = await pendant($("bouton-creation"), "Création…", () => donnees.creerProfil(champs));
     ouvrirProfil(profil);
   } catch (e) {
-    afficherMessage("erreur-profil", messageErreur(e));
+    afficherMessage("erreur-creation", messageErreur(e));
   }
 });
-$("annuler-profil").addEventListener("click", () => (moi ? ouvrirProfil(moi) : afficherChoix()));
-$("modifier-athlete").addEventListener("click", () => ouvrirFormulaireProfil(moi));
-$("modifier-coach").addEventListener("click", () => ouvrirFormulaireProfil(moi));
+$("annuler-creation").addEventListener("click", afficherChoix);
 
 /* =========================================================
-   7. ESPACE ATHLÈTE : voir ses séances
+   6. ONGLET FIL : les séances faites ou publiées par tout le groupe
    ========================================================= */
-function carteSeance(s, { avecCoach = false, supprimable = false } = {}) {
-  const pied = el("div", { class: "seance-pied" });
-  if (avecCoach) pied.append(el("span", {}, "Proposée par " + nomComplet(s.coach)));
-  if (supprimable) {
-    const b = el("button", { class: "lien", type: "button" }, "Supprimer");
-    b.addEventListener("click", async () => {
-      try { await pendant(b, "Suppression…", () => donnees.supprimerSeance(s.id)); afficherSeancesCoach(); }
-      catch (e) { afficherMessage("erreur-seance", messageErreur(e)); }
-    });
-    pied.append(b);
-  }
-  return el("article", { class: "seance" }, [
-    el("span", { class: "seance-date" }, formatDate(s.date)),
+const PAR_PAGE = 15;
+let pageFil = 0;
+
+function carteFil(s) {
+  const auteur = s.athlete || {};
+  const quoi = s.coach_id ? "a fait la séance de " + nomComplet(s.coach) : "a publié une séance";
+  const carte = el("article", { class: "seance" }, [
+    el("div", { class: "post-tete" }, [
+      avatarEl(auteur, "petit"),
+      el("div", { class: "post-qui" }, [
+        el("b", {}, nomComplet(auteur)),
+        el("div", { class: "muted petit" }, quoi + " · " + ilYa(s.fait_le)),
+      ]),
+    ]),
+    s.date ? el("span", { class: "seance-date" }, formatDate(s.date)) : null,
     s.titre ? el("p", { class: "seance-titre" }, s.titre) : null,
     s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : null,
-    pied.childNodes.length ? pied : null,
+    s.ressenti ? el("div", { class: "etat" }, badgeRessenti(s.ressenti)) : null,
+    s.commentaire ? el("blockquote", { class: "commentaire" }, s.commentaire) : null,
   ]);
+  // On peut supprimer ses propres publications libres
+  if (!s.coach_id && moi && auteur.id === moi.id) {
+    const b = el("button", { type: "button", class: "lien petit", style: "justify-self:start" }, "Supprimer ma publication");
+    b.addEventListener("click", async () => {
+      try { await pendant(b, "Suppression…", () => donnees.supprimerSeance(s.id)); carte.remove(); }
+      catch (e) { b.replaceWith(el("p", { class: "error" }, messageErreur(e))); }
+    });
+    carte.append(b);
+  }
+  return carte;
 }
 
-async function afficherAthlete() {
-  $("athlete-prenom").textContent = moi.prenom;
-  $("athlete-discipline").textContent = moi.discipline || "Non renseignée";
-  montrer("ecran-athlete");
-  await chargerSeancesAthlete();
-}
-
-async function chargerSeancesAthlete() {
-  const zone = $("athlete-seances");
-  zone.replaceChildren(el("p", { class: "muted" }, "Chargement des séances…"));
+async function chargerFil(depuisLeDebut) {
+  const liste = $("fil-liste");
+  if (depuisLeDebut) {
+    pageFil = 0;
+    liste.replaceChildren(el("p", { class: "muted" }, "Chargement du fil…"));
+  }
   try {
-    const seances = await donnees.seancesDe(moi.id);
-    zone.replaceChildren();
-    if (seances.length === 0) zone.append(el("p", { class: "vide" }, "Pas encore de séance. Ton coach t'en enverra bientôt."));
-    else seances.forEach((s) => zone.append(carteSeance(s, { avecCoach: true })));
+    const de = pageFil * PAR_PAGE;
+    const posts = await donnees.fil(de, de + PAR_PAGE - 1);
+    if (depuisLeDebut) liste.replaceChildren();
+    if (depuisLeDebut && posts.length === 0) {
+      liste.append(el("p", { class: "vide" }, "Rien pour l'instant. Dès qu'une séance sera cochée comme faite ou publiée, elle apparaîtra ici."));
+    }
+    posts.forEach((s) => liste.append(carteFil(s)));
+    $("fil-plus").hidden = posts.length < PAR_PAGE;
+    pageFil++;
   } catch (e) {
-    zone.replaceChildren(el("p", { class: "error" }, messageErreur(e)));
+    liste.replaceChildren(el("p", { class: "error" }, messageErreur(e)));
+    $("fil-plus").hidden = true;
   }
 }
-$("actualiser").addEventListener("click", chargerSeancesAthlete);
+$("fil-plus").addEventListener("click", () => pendant($("fil-plus"), "Chargement…", () => chargerFil(false)));
+
+// Publier une séance faite de son côté
+let ressentiPublier = null;
+$("ouvrir-publier").addEventListener("click", () => {
+  $("form-publier").reset();
+  $("pub-date").value = aujourdhui();
+  ressentiPublier = choixRessenti("pub-rpe", null);
+  $("pub-ressenti").replaceChildren(ressentiPublier);
+  afficherMessage("erreur-publier", "");
+  $("form-publier").hidden = false;
+  $("ouvrir-publier").hidden = true;
+  $("pub-titre").focus();
+});
+function fermerPublier() { $("form-publier").hidden = true; $("ouvrir-publier").hidden = false; }
+$("annuler-publier").addEventListener("click", fermerPublier);
+
+$("form-publier").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const titre = $("pub-titre").value.trim();
+  const contenu = $("pub-contenu").value.trim();
+  if (!titre && !contenu) return afficherMessage("erreur-publier", "Donne au moins un titre ou un contenu à ta séance.");
+  try {
+    await pendant($("bouton-publier"), "Publication…", () => donnees.envoyerSeance({
+      athlete_id: moi.id, coach_id: null,
+      date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null,
+      fait: true, fait_le: new Date().toISOString(),
+      ressenti: ressentiPublier.valeur(), commentaire: $("pub-commentaire").value.trim() || null,
+    }));
+    fermerPublier();
+    chargerFil(true);
+  } catch (e) {
+    afficherMessage("erreur-publier", messageErreur(e));
+  }
+});
 
 /* =========================================================
-   8. ESPACE COACH : choisir un athlète et lui écrire sa séance
+   7. ONGLET MA SEMAINE : les séances du coach, à cocher
+   ========================================================= */
+let decalageSemaine = 0; // 0 = cette semaine, -1 = la précédente, 1 = la suivante
+let seancesSemaine = [];
+
+function lundiDe(d) {
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
+async function chargerSemaine() {
+  const lundi = lundiDe(new Date());
+  lundi.setDate(lundi.getDate() + 7 * decalageSemaine);
+  const dimanche = new Date(lundi);
+  dimanche.setDate(dimanche.getDate() + 6);
+
+  const titres = { "-1": "Semaine dernière", "0": "Cette semaine", "1": "Semaine prochaine" };
+  $("sem-titre").textContent = titres[decalageSemaine] || (decalageSemaine < 0 ? "Semaine passée" : "Semaine à venir");
+  const jm = { day: "numeric", month: "long" };
+  $("sem-dates").textContent = "Du lundi " + lundi.toLocaleDateString("fr-FR", jm) + " au dimanche " + dimanche.toLocaleDateString("fr-FR", jm);
+
+  const liste = $("sem-liste");
+  liste.replaceChildren(el("p", { class: "muted" }, "Chargement des séances…"));
+  $("sem-progression").hidden = true;
+  try {
+    let seances = await donnees.semaine(moi.id, isoLocal(lundi), isoLocal(dimanche));
+    if (decalageSemaine === 0) seances = seances.concat(await donnees.sansDate(moi.id));
+    seancesSemaine = seances;
+    liste.replaceChildren();
+    if (seances.length === 0) {
+      liste.append(el("p", { class: "vide" }, decalageSemaine === 0
+        ? "Pas de séance prévue cette semaine pour l'instant. Ton coach t'en enverra bientôt."
+        : "Aucune séance prévue cette semaine-là."));
+    } else {
+      seances.forEach((s) => liste.append(carteSemaine(s)));
+    }
+    majProgression();
+  } catch (e) {
+    liste.replaceChildren(el("p", { class: "error" }, messageErreur(e)));
+  }
+}
+
+function majProgression() {
+  const total = seancesSemaine.length;
+  const faites = seancesSemaine.filter((s) => s.fait).length;
+  $("sem-progression").hidden = total === 0;
+  $("sem-barre").style.width = (total ? (faites / total) * 100 : 0) + "%";
+  $("sem-compte").textContent = faites + " séance" + (faites > 1 ? "s" : "") + " faite" + (faites > 1 ? "s" : "") + " sur " + total;
+}
+
+function carteSemaine(s) {
+  const carte = el("article", { class: "seance" });
+  const zone = el("div", { class: "ressenti-zone" });
+  carte.append(
+    el("span", { class: "seance-date" }, formatDate(s.date)),
+    s.titre ? el("p", { class: "seance-titre" }, s.titre) : "",
+    s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : "",
+    el("p", { class: "muted petit" }, "Proposée par " + nomComplet(s.coach)),
+    zone,
+  );
+
+  // Affiche l'état : à faire, ou faite avec le ressenti
+  function afficherEtat() {
+    carte.classList.toggle("faite", !!s.fait);
+    zone.replaceChildren();
+    if (!s.fait) {
+      const cocher = el("button", { type: "button", class: "cocher" }, [el("span", { class: "case", "aria-hidden": "true" }), "J'ai fait cette séance"]);
+      cocher.addEventListener("click", ouvrirFormulaire);
+      zone.append(cocher);
+      return;
+    }
+    zone.append(el("div", { class: "etat" }, [
+      el("span", { class: "pill faite" }, "✓ Faite"),
+      s.ressenti ? badgeRessenti(s.ressenti) : null,
+    ]));
+    if (s.commentaire) zone.append(el("blockquote", { class: "commentaire" }, s.commentaire));
+    const modifier = el("button", { type: "button", class: "lien petit" }, "Modifier mon ressenti");
+    modifier.addEventListener("click", ouvrirFormulaire);
+    const decocher = el("button", { type: "button", class: "lien petit" }, "Marquer comme non faite");
+    decocher.addEventListener("click", async () => {
+      const maj = { fait: false, fait_le: null, ressenti: null, commentaire: null };
+      try { await pendant(decocher, "…", () => donnees.majSeance(s.id, maj)); Object.assign(s, maj); afficherEtat(); majProgression(); }
+      catch (e) { zone.append(el("p", { class: "error" }, messageErreur(e))); }
+    });
+    zone.append(el("div", { class: "actions" }, [modifier, decocher]));
+  }
+
+  // Formulaire de ressenti : difficulté + commentaire
+  function ouvrirFormulaire() {
+    const rpe = choixRessenti("rpe-" + s.id, s.ressenti);
+    const idCom = "com-" + s.id;
+    const com = el("textarea", { id: idCom, placeholder: "Comment ça s'est passé ? Sensations, chronos, douleurs…" });
+    com.value = s.commentaire || "";
+    const erreur = el("p", { class: "error", hidden: "" });
+    const valider = el("button", { type: "button" }, "Valider");
+    const annuler = el("button", { type: "button", class: "ghost" }, "Annuler");
+
+    valider.addEventListener("click", async () => {
+      const maj = {
+        fait: true,
+        fait_le: s.fait && s.fait_le ? s.fait_le : new Date().toISOString(),
+        ressenti: rpe.valeur(),
+        commentaire: com.value.trim() || null,
+      };
+      try {
+        await pendant(valider, "Enregistrement…", () => donnees.majSeance(s.id, maj));
+        Object.assign(s, maj);
+        afficherEtat();
+        majProgression();
+      } catch (e) {
+        erreur.textContent = messageErreur(e);
+        erreur.hidden = false;
+      }
+    });
+    annuler.addEventListener("click", afficherEtat);
+
+    zone.replaceChildren(el("div", { class: "form-ressenti" }, [
+      rpe,
+      el("div", { class: "field" }, [el("label", { for: idCom }, "Ton ressenti"), com]),
+      erreur,
+      el("div", { class: "actions" }, [valider, annuler]),
+    ]));
+  }
+
+  afficherEtat();
+  return carte;
+}
+
+$("sem-prec").addEventListener("click", () => { decalageSemaine--; chargerSemaine(); });
+$("sem-suiv").addEventListener("click", () => { decalageSemaine++; chargerSemaine(); });
+
+/* =========================================================
+   8. ONGLET PLANIFIER (coach) : écrire les séances et suivre les retours
    ========================================================= */
 const choixAthlete = $("choix-athlete");
 let athletes = [];
 
-async function afficherCoach() {
+async function afficherPlanifier() {
   $("coach-prenom").textContent = moi.prenom;
   afficherMessage("ok-seance", "");
   afficherMessage("erreur-seance", "");
   if (!$("seance-date").value) $("seance-date").value = demain();
-  montrer("ecran-coach");
 
-  try {
-    athletes = await donnees.athletes();
-  } catch (e) {
-    athletes = [];
-    afficherMessage("erreur-seance", messageErreur(e));
-  }
+  try { athletes = await donnees.athletes(); }
+  catch (e) { athletes = []; afficherMessage("erreur-seance", messageErreur(e)); }
+
   const dejaChoisi = choixAthlete.value;
   choixAthlete.replaceChildren(...athletes.map((a) => el("option", { value: a.id }, nomComplet(a) + (a.discipline ? " · " + a.discipline : ""))));
   if (athletes.some((a) => a.id === dejaChoisi)) choixAthlete.value = dejaChoisi;
@@ -573,6 +1044,25 @@ async function afficherCoach() {
   if (!aucun) afficherSeancesCoach();
 }
 
+function carteCoach(s) {
+  const carte = el("article", { class: "seance" + (s.fait ? " faite" : "") }, [
+    el("span", { class: "seance-date" }, formatDate(s.date)),
+    s.titre ? el("p", { class: "seance-titre" }, s.titre) : null,
+    s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : null,
+    el("div", { class: "etat" }, s.fait
+      ? [el("span", { class: "pill faite" }, "✓ Faite"), s.ressenti ? badgeRessenti(s.ressenti) : null]
+      : [el("span", { class: "pill" }, "À faire")]),
+    s.fait && s.commentaire ? el("blockquote", { class: "commentaire" }, s.commentaire) : null,
+  ]);
+  const b = el("button", { class: "lien petit", type: "button", style: "justify-self:start" }, "Supprimer");
+  b.addEventListener("click", async () => {
+    try { await pendant(b, "Suppression…", () => donnees.supprimerSeance(s.id)); afficherSeancesCoach(); }
+    catch (e) { afficherMessage("erreur-seance", messageErreur(e)); }
+  });
+  carte.append(b);
+  return carte;
+}
+
 async function afficherSeancesCoach() {
   const athlete = athletes.find((a) => a.id === choixAthlete.value);
   const zone = $("coach-seances");
@@ -580,19 +1070,16 @@ async function afficherSeancesCoach() {
   $("coach-titre-liste").textContent = "Séances de " + athlete.prenom;
   zone.replaceChildren(el("p", { class: "muted" }, "Chargement…"));
   try {
-    const seances = await donnees.seancesDe(athlete.id);
+    const seances = await donnees.seancesDuCoachPour(athlete.id);
     zone.replaceChildren();
     if (seances.length === 0) zone.append(el("p", { class: "vide" }, "Aucune séance envoyée à " + athlete.prenom + " pour l'instant."));
-    else seances.forEach((s) => zone.append(carteSeance(s, { supprimable: true })));
+    else seances.forEach((s) => zone.append(carteCoach(s)));
   } catch (e) {
     zone.replaceChildren(el("p", { class: "error" }, messageErreur(e)));
   }
 }
 
-choixAthlete.addEventListener("change", () => {
-  afficherMessage("ok-seance", "");
-  afficherSeancesCoach();
-});
+choixAthlete.addEventListener("change", () => { afficherMessage("ok-seance", ""); afficherSeancesCoach(); });
 
 $("form-seance").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -603,7 +1090,6 @@ $("form-seance").addEventListener("submit", async (event) => {
   const contenu = $("seance-contenu").value.trim();
   const date = $("seance-date").value || null;
   if (!titre && !contenu) return afficherMessage("erreur-seance", "Donne au moins un titre ou un contenu à la séance.");
-
   try {
     await pendant($("bouton-seance"), "Envoi…", () =>
       donnees.envoyerSeance({ athlete_id: athlete.id, coach_id: moi.id, date, titre: titre || null, contenu: contenu || null }));
@@ -617,8 +1103,95 @@ $("form-seance").addEventListener("submit", async (event) => {
 });
 
 /* =========================================================
-   9. DÉMARRAGE : on arrive toujours sur « Qui es-tu ? »
+   9. ONGLET PROFIL : photo, description, statistiques
    ========================================================= */
+let photoEnAttente = null;   // la nouvelle photo choisie, pas encore envoyée
+let apercuUrl = null;
+
+async function afficherProfil() {
+  $("profil-form").hidden = true;
+  $("profil-vue").hidden = false;
+  $("profil-avatar").replaceChildren(avatarEl(moi, "grand"));
+  $("profil-nom").textContent = nomComplet(moi);
+  $("profil-badge").textContent = moi.role;
+  $("profil-badge").className = "badge" + (moi.role === "Coach" ? " coach" : "");
+  $("profil-discipline").textContent = moi.discipline || "";
+  const desc = $("profil-description");
+  desc.textContent = moi.description || "Pas encore de description. Présente-toi en quelques mots !";
+  desc.classList.toggle("muted", !moi.description);
+  $("profil-stat").textContent = "–";
+  try { $("profil-stat").textContent = await donnees.nbSeancesFaites(moi.id); } catch (e) {}
+}
+
+function majCompteur() { $("pf-compteur").textContent = $("pf-description").value.length + " / 300"; }
+
+$("profil-modifier").addEventListener("click", () => {
+  photoEnAttente = null;
+  if (apercuUrl) { URL.revokeObjectURL(apercuUrl); apercuUrl = null; }
+  $("photo").value = "";
+  $("photo-apercu").replaceChildren(avatarEl(moi, "grand"));
+  $("pf-prenom").value = moi.prenom;
+  $("pf-nom").value = moi.nom || "";
+  $("pf-discipline").value = moi.discipline || DISCIPLINES[0];
+  $("pf-description").value = moi.description || "";
+  majCompteur();
+  $("pf-role").textContent = moi.role === "Coach"
+    ? "Ton rôle : Coach."
+    : "Ton rôle : Athlète. Le rôle Coach est attribué par l'administratrice du site.";
+  afficherMessage("erreur-pf", "");
+  $("profil-vue").hidden = true;
+  $("profil-form").hidden = false;
+});
+$("pf-description").addEventListener("input", majCompteur);
+
+$("photo").addEventListener("change", async () => {
+  const fichier = $("photo").files[0];
+  if (!fichier) return;
+  afficherMessage("erreur-pf", "");
+  try {
+    photoEnAttente = await preparerPhoto(fichier);
+    if (apercuUrl) URL.revokeObjectURL(apercuUrl);
+    apercuUrl = URL.createObjectURL(photoEnAttente);
+    $("photo-apercu").replaceChildren(avatarEl(moi, "grand", apercuUrl));
+  } catch (e) {
+    photoEnAttente = null;
+    afficherMessage("erreur-pf", e.message);
+  }
+});
+
+$("annuler-pf").addEventListener("click", afficherProfil);
+
+$("profil-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const champs = {
+    prenom: $("pf-prenom").value.trim(),
+    nom: $("pf-nom").value.trim() || null,
+    discipline: $("pf-discipline").value,
+    description: $("pf-description").value.trim() || null,
+  };
+  if (!champs.prenom) return afficherMessage("erreur-pf", "Indique ton prénom.");
+  try {
+    await pendant($("bouton-pf"), "Enregistrement…", async () => {
+      if (photoEnAttente) champs.photo_url = await donnees.envoyerPhoto(moi.id, photoEnAttente);
+      await donnees.modifierProfil(moi.id, champs);
+      moi = (await donnees.profil(moi.id)) || { ...moi, ...champs };
+    });
+    photoEnAttente = null;
+    majEntete();
+    afficherProfil();
+  } catch (e) {
+    afficherMessage("erreur-pf", messageErreur(e));
+  }
+});
+
+/* =========================================================
+   10. DÉMARRAGE : on arrive toujours sur « Qui es-tu ? »
+   ========================================================= */
+try {
+  // Ménage : on efface ce que les anciennes versions avaient rangé dans le navigateur
+  localStorage.removeItem("couloir-comptes");
+  Object.keys(localStorage).filter((k) => k.startsWith("sb-")).forEach((k) => localStorage.removeItem(k));
+} catch (e) {}
 afficherChoix();
 </script>
 </body>
