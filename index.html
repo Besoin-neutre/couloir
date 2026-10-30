@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Séances d'athlé</title>
+<!-- Pour l'ajouter à l'écran d'accueil du téléphone comme une appli -->
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Athlé">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#f3f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#11171d" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700&family=Source+Sans+3:wght@400;600&display=swap">
 <style>
@@ -181,6 +191,18 @@ button.lien {
   font-size: 11px; letter-spacing: .03em; text-transform: uppercase; min-width: 0;
 }
 .nav button svg { width: 24px; height: 24px; }
+.nav button { position: relative; }
+.pastille {
+  position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 99px; background: var(--erreur); color: #fff; font-size: 11px; font-weight: 700;
+  letter-spacing: 0; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+.nouveau {
+  font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--surface); background: var(--track); border-radius: 4px; padding: 1px 6px;
+}
+.post-nom { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .nav button[aria-current="page"] { color: var(--track); box-shadow: inset 0 3px 0 var(--track); }
 .panneau { display: grid; gap: 16px; min-width: 0; }
 .entete-panneau { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
@@ -290,7 +312,7 @@ button.cocher:hover .case { background: var(--ok); }
   text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 400; color: var(--ink);
 }
 .option input { width: 18px; height: 18px; accent-color: var(--track); }
-.groupe-libre { display: grid; gap: 16px; }
+.groupe-libre, .editeur-modele { display: grid; gap: 16px; }
 .apercu { border: 1px dashed var(--track); border-radius: 8px; padding: 12px 14px; display: grid; gap: 4px; background: var(--bg); min-width: 0; }
 .seance-haut { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .type-chip {
@@ -309,6 +331,11 @@ button.cocher:hover .case { background: var(--ok); }
 /* Boutons radio cachés (remplacés par des pastilles) : ils ne doivent pas élargir la page */
 .types, .couleurs, .rpe-ligne { position: relative; }
 .types input, .couleurs input, .rpe-ligne input { left: 0; top: 0; width: 1px; height: 1px; margin: 0; }
+
+/* Encadré « Mets l'appli sur ton écran d'accueil » */
+.installer { display: flex; align-items: flex-start; gap: 12px; border-top: 1px solid var(--line); padding-top: 16px; }
+.installer img { flex: none; border-radius: 11px; }
+.installer > div { display: grid; gap: 6px; min-width: 0; }
 
 /* Prénoms cliquables */
 button.personne { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-align: left; border-radius: 4px; }
@@ -433,6 +460,17 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
     <h2>Qui es-tu ?</h2>
     <p class="intro">Touche ton profil pour l'ouvrir. Pas encore de profil ? Ajoute le tien.</p>
     <div class="grille" id="grille-profils"></div>
+    <div class="installer" id="installer" hidden>
+      <img src="icon-192.png" alt="" width="48" height="48">
+      <div>
+        <b>Mets l'appli sur ton écran d'accueil</b>
+        <p class="muted petit" id="installer-aide"></p>
+        <div class="actions">
+          <button type="button" class="compact" id="installer-bouton" hidden>Installer</button>
+          <button type="button" class="lien petit" id="installer-masquer">Masquer</button>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ÉCRAN : ajouter un nouveau profil -->
@@ -479,20 +517,11 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
 
       <form class="card" id="form-publier" hidden novalidate>
         <h3>Une séance faite de ton côté</h3>
-        <div class="row">
-          <div class="field">
-            <label for="pub-date">Date</label>
-            <input id="pub-date" type="date">
-          </div>
-          <div class="field">
-            <label for="pub-titre">Titre</label>
-            <input id="pub-titre" placeholder="Footing de récupération">
-          </div>
+        <div class="field" style="max-width:220px">
+          <label for="pub-date">Date</label>
+          <input id="pub-date" type="date">
         </div>
-        <div class="field">
-          <label for="pub-contenu">Contenu</label>
-          <textarea id="pub-contenu" placeholder="45 min en endurance fondamentale + 5 lignes droites"></textarea>
-        </div>
+        <div id="pub-modele"></div>
         <div class="saisie-effort">
           <div class="field">
             <label for="pub-distance">Distance (km)</label>
@@ -738,7 +767,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
 function verifier({ data, error }) { if (error) throw error; return data; }
 
 const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url, couleur";
-const CHAMPS_SEANCE = "id, date, type, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
+const CHAMPS_SEANCE = "id, cree_le, date, type, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
 const CHAMPS_COMMENTAIRE = "id, texte, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url, couleur)";
 const CHAMPS_FIL = CHAMPS_SEANCE
   + ", reactions(auteur_id, emoji)"
@@ -806,6 +835,19 @@ const donnees = {
     return verifier(await sb.from("commentaires")
       .insert({ seance_id: seanceId, auteur_id: auteurId, texte })
       .select(CHAMPS_COMMENTAIRE).single());
+  },
+  // Nouveautés depuis la dernière visite
+  async nbNouveauxPosts(moiId, depuis) {
+    const { count, error } = await sb.from("seances").select("id", { count: "exact", head: true })
+      .eq("fait", true).neq("athlete_id", moiId).gt("fait_le", depuis);
+    if (error) throw error;
+    return count || 0;
+  },
+  async nbNouvellesSeances(moiId, depuis) {
+    const { count, error } = await sb.from("seances").select("id", { count: "exact", head: true })
+      .eq("athlete_id", moiId).not("coach_id", "is", null).neq("coach_id", moiId).gt("cree_le", depuis);
+    if (error) throw error;
+    return count || 0;
   },
   async reagir(seanceId, auteurId, emoji) {
     verifier(await sb.from("reactions").insert({ seance_id: seanceId, auteur_id: auteurId, emoji }));
@@ -1073,6 +1115,88 @@ function blocFractionne(v) {
   return v.series > 1 ? v.series + " × (" + base + ")" : base;
 }
 
+/* Éditeur « type de séance + champs préremplis », utilisé quand un athlète publie une séance.
+   surChangement(type, valeurs) est appelé à chaque modification. */
+function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = false, surChangement = () => {} } = {}) {
+  let type = MODELES[typeInitial] ? typeInitial : "footing";
+  const saisies = {};
+  const types = el("div", { class: "types" });
+  const champs = el("div", { class: "champs" });
+  const ech = el("input", { type: "checkbox", id: prefixe + "-echauffement" });
+  ech.checked = echauffementCoche;
+  const optionEch = el("label", { class: "option" }, [ech, "Ajouter l'échauffement et le retour au calme"]);
+  const titre = el("input", { id: prefixe + "-titre", placeholder: "Séance de côtes en forêt" });
+  const contenu = el("textarea", { id: prefixe + "-contenu", placeholder: "Ce que tu as fait : échauffement, corps de séance, retour au calme…" });
+  const libre = el("div", { class: "groupe-libre" }, [
+    el("div", { class: "field" }, [el("label", { for: titre.id }, "Titre"), titre]),
+    el("div", { class: "field" }, [el("label", { for: contenu.id }, "Contenu"), contenu]),
+  ]);
+  const apTitre = el("p", { class: "seance-titre" });
+  const apContenu = el("p", { class: "seance-contenu" });
+  const apercu = el("div", { class: "apercu" }, [el("span", { class: "label" }, "Aperçu dans le fil"), apTitre, apContenu]);
+
+  function valeurs() {
+    const v = {};
+    (MODELES[type].champs || []).forEach((c) => {
+      const n = parseInt(saisies[c.id + "-" + type] ?? c.defaut, 10);
+      v[c.id] = n > 0 ? n : c.defaut;
+    });
+    return v;
+  }
+  function seance() {
+    const m = MODELES[type];
+    if (m.libre) return { type, titre: titre.value.trim(), contenu: contenu.value.trim() };
+    const v = valeurs();
+    const lignes = [m.corps(v)];
+    if (m.echauffement && ech.checked) { lignes.unshift(m.echauffement); lignes.push(RETOUR_AU_CALME); }
+    return { type, titre: m.titre(v), contenu: lignes.join("\n") };
+  }
+  function maj() {
+    if (!MODELES[type].libre) {
+      const sc = seance();
+      apTitre.textContent = sc.titre;
+      apContenu.textContent = sc.contenu;
+    }
+    surChangement(type, valeurs());
+  }
+  function construireChamps() {
+    const m = MODELES[type];
+    libre.hidden = !m.libre;
+    apercu.hidden = !!m.libre;
+    champs.hidden = !!m.libre;
+    optionEch.hidden = !m.echauffement;
+    champs.replaceChildren(...(m.champs || []).map((c) => {
+      const id = prefixe + "-" + type + "-" + c.id;
+      const input = el("input", { type: "number", id, min: "1", step: "1", inputmode: "numeric" });
+      input.value = saisies[c.id + "-" + type] ?? c.defaut;
+      input.addEventListener("input", () => { saisies[c.id + "-" + type] = input.value; maj(); });
+      return el("div", { class: "field" }, [
+        el("label", { for: id }, c.label),
+        el("div", { class: "avec-unite" }, [input, c.unite ? el("span", {}, c.unite) : null]),
+      ]);
+    }));
+    maj();
+  }
+  types.replaceChildren(...Object.entries(MODELES).flatMap(([cle, m]) => {
+    const id = prefixe + "-type-" + cle;
+    const input = el("input", { type: "radio", name: prefixe + "-type", id, value: cle });
+    if (cle === type) input.checked = true;
+    input.addEventListener("change", () => { type = cle; construireChamps(); });
+    return [input, el("label", { for: id }, m.nom)];
+  }));
+  ech.addEventListener("change", maj);
+  construireChamps();
+
+  return {
+    bloc: el("div", { class: "editeur-modele" }, [
+      el("fieldset", {}, [el("legend", { class: "label" }, "Type de séance"), types]),
+      champs, optionEch, libre, apercu,
+    ]),
+    seance,
+    get type() { return type; },
+  };
+}
+
 // En-tête d'une carte : date + type de séance
 function enTeteSeance(s) {
   return el("div", { class: "seance-haut" }, [
@@ -1306,6 +1430,42 @@ function ouvrirProfil(profil) {
   aller(liste.includes(memorise) ? memorise : "fil");
 }
 
+/* ---------- Pastilles « nouveau » sur les onglets Fil et Semaine ----------
+   Chaque appareil retient, pour chaque profil, la dernière visite de ces onglets. */
+const vuAvant = { fil: null, semaine: null }; // la visite précédente, pour marquer les nouveautés
+function cleVu(o) { return "couloir-vu-" + o + "-" + moi.id; }
+function marquerVu(o) {
+  vuAvant[o] = lire(cleVu(o)) || new Date().toISOString();
+  ecrire(cleVu(o), new Date().toISOString());
+  poserPastille(o, 0);
+}
+function poserPastille(o, n) {
+  const b = $("nav-int").querySelector('button[data-onglet="' + o + '"]');
+  if (!b) return;
+  let p = b.querySelector(".pastille");
+  if (!n) { if (p) p.remove(); b.setAttribute("aria-label", NOMS_ONGLETS[o]); return; }
+  if (!p) { p = el("span", { class: "pastille", "aria-hidden": "true" }); b.append(p); }
+  p.textContent = n > 9 ? "9+" : String(n);
+  b.setAttribute("aria-label", NOMS_ONGLETS[o] + ", " + n + " nouveauté" + (n > 1 ? "s" : ""));
+}
+async function majPastilles() {
+  if (!moi) return;
+  const qui = moi.id;
+  const verifs = [["fil", donnees.nbNouveauxPosts], ["semaine", donnees.nbNouvellesSeances]];
+  for (const [o, compter] of verifs) {
+    if (onglet === o) continue; // l'onglet ouvert est déjà « vu »
+    let depuis = lire(cleVu(o));
+    if (!depuis) { depuis = new Date().toISOString(); ecrire(cleVu(o), depuis); } // première visite sur cet appareil
+    try {
+      const n = await compter(qui, depuis);
+      if (moi && moi.id === qui && onglet !== o) poserPastille(o, n);
+    } catch (e) { /* pas grave : on réessaiera plus tard */ }
+  }
+}
+// On revérifie quand on revient sur l'appli, et toutes les 2 minutes
+document.addEventListener("visibilitychange", () => { if (!document.hidden) majPastilles(); });
+setInterval(() => { if (!document.hidden) majPastilles(); }, 120000);
+
 // Profil affiché dans l'onglet Profil : le sien, ou celui de quelqu'un d'autre
 let profilVu = null;
 let retourProfil = null; // { onglet, defilement } pour revenir là où on était
@@ -1320,6 +1480,8 @@ function aller(o, personne = null) {
     if (b.dataset.onglet === o) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   });
   window.scrollTo(0, 0);
+  if (o === "fil" || o === "semaine") marquerVu(o);
+  majPastilles();
   if (o === "fil") chargerFil(true);
   if (o === "semaine") chargerSemaine();
   if (o === "planifier") afficherPlanifier();
@@ -1332,6 +1494,34 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
 /* =========================================================
    5. PAGE D'ACCUEIL « QUI ES-TU ? »
    ========================================================= */
+/* ---------- Ajouter l'appli à l'écran d'accueil ---------- */
+let demandeInstallation = null; // proposée par Chrome sur Android
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  demandeInstallation = e;
+  majInstaller();
+});
+window.addEventListener("appinstalled", () => { demandeInstallation = null; $("installer").hidden = true; });
+
+function majInstaller() {
+  const dejaInstallee = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  if (dejaInstallee || lire("couloir-installer-masque")) { $("installer").hidden = true; return; }
+  // Tout le groupe est sur iPhone : on donne la marche à suivre de Safari
+  $("installer-bouton").hidden = !demandeInstallation;
+  $("installer-aide").textContent = demandeInstallation
+    ? "Elle s'ouvrira en plein écran, comme une vraie appli."
+    : "Sur iPhone, dans Safari : touche le bouton Partager (le carré avec une flèche vers le haut, parfois caché dans le menu ⋯), puis « Sur l'écran d'accueil » et « Ajouter ».";
+  $("installer").hidden = false;
+}
+$("installer-bouton").addEventListener("click", async () => {
+  if (!demandeInstallation) return;
+  demandeInstallation.prompt();
+  await demandeInstallation.userChoice.catch(() => null);
+  demandeInstallation = null;
+  majInstaller();
+});
+$("installer-masquer").addEventListener("click", () => { ecrire("couloir-installer-masque", "1"); $("installer").hidden = true; });
+
 async function afficherChoix() {
   moi = null;
   majEntete();
@@ -1365,6 +1555,7 @@ async function afficherChoix() {
   });
 
   $("grille-profils").replaceChildren(...tuiles, el("div", { class: "tuile-wrap" }, ajout));
+  majInstaller();
   montrer("ecran-choix");
 }
 
@@ -1424,8 +1615,11 @@ function lienPersonne(p, enfants, classe = "personne") {
   return b;
 }
 
+function etiquetteNouveau() { return el("span", { class: "nouveau" }, "Nouveau"); }
+
 function carteFil(s) {
   const auteur = s.athlete || {};
+  const estNouveau = vuAvant.fil && s.fait_le > vuAvant.fil && moi && auteur.id !== moi.id;
   const quoi = !s.coach_id ? "a publié une séance"
     : s.coach_id === auteur.id ? "a fait sa séance prévue"
     : "a fait la séance de " + nomComplet(s.coach);
@@ -1433,7 +1627,7 @@ function carteFil(s) {
     el("div", { class: "post-tete" }, [
       lienPersonne(auteur, avatarEl(auteur, "petit"), "personne avatar-lien"),
       el("div", { class: "post-qui" }, [
-        lienPersonne(auteur, el("b", {}, nomComplet(auteur))),
+        el("div", { class: "post-nom" }, [lienPersonne(auteur, el("b", {}, nomComplet(auteur))), estNouveau ? etiquetteNouveau() : null]),
         el("div", { class: "muted petit" }, quoi + " · " + ilYa(s.fait_le)),
       ]),
     ]),
@@ -1604,9 +1798,23 @@ $("fil-plus").addEventListener("click", () => pendant($("fil-plus"), "Chargement
 // Publier une séance faite de son côté
 let ressentiPublier = null;
 let photoPublier = null;
+let modelePublier = null;
+let dureeTapee = false; // la durée a-t-elle été tapée à la main ?
+$("pub-duree").addEventListener("input", () => { dureeTapee = $("pub-duree").value.trim() !== ""; });
 $("ouvrir-publier").addEventListener("click", () => {
   $("form-publier").reset();
   $("pub-date").value = aujourdhui();
+  dureeTapee = false;
+  // Pour un footing, une sortie longue ou du renfo, la durée du modèle remplit la case « Durée »
+  modelePublier = editeurModele("pub", {
+    typeInitial: lire("couloir-type-pub") || "footing",
+    surChangement: (type, v) => {
+      ecrire("couloir-type-pub", type);
+      const dureeMin = (MODELES[type].champs || []).find((c) => c.id === "duree" && c.unite === "min");
+      if (!dureeTapee) $("pub-duree").value = dureeMin ? String(v.duree) : "";
+    },
+  });
+  $("pub-modele").replaceChildren(modelePublier.bloc);
   ressentiPublier = choixRessenti("pub-rpe", null);
   photoPublier = champPhoto("pub-image", null);
   $("pub-photo").replaceChildren(photoPublier.bloc);
@@ -1614,20 +1822,19 @@ $("ouvrir-publier").addEventListener("click", () => {
   afficherMessage("erreur-publier", "");
   $("form-publier").hidden = false;
   $("ouvrir-publier").hidden = true;
-  $("pub-titre").focus();
+  $("form-publier").scrollIntoView({ behavior: "smooth", block: "start" });
 });
 function fermerPublier() { $("form-publier").hidden = true; $("ouvrir-publier").hidden = false; }
 $("annuler-publier").addEventListener("click", fermerPublier);
 
 $("form-publier").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const titre = $("pub-titre").value.trim();
-  const contenu = $("pub-contenu").value.trim();
+  const { type, titre, contenu } = modelePublier.seance();
   if (!titre && !contenu) return afficherMessage("erreur-publier", "Donne au moins un titre ou un contenu à ta séance.");
   try {
     const effort = lireEffort($("pub-distance"), $("pub-duree"));
     await pendant($("bouton-publier"), "Publication…", async () => donnees.envoyerSeance({
-      athlete_id: moi.id, coach_id: null,
+      athlete_id: moi.id, coach_id: null, type,
       date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null,
       fait: true, fait_le: new Date().toISOString(),
       ressenti: ressentiPublier.valeur(), commentaire: $("pub-commentaire").value.trim() || null,
@@ -1698,8 +1905,11 @@ function majProgression() {
 function carteSemaine(s) {
   const carte = el("article", { class: "seance" });
   const zone = el("div", { class: "ressenti-zone" });
+  const estNouvelle = vuAvant.semaine && s.cree_le && s.cree_le > vuAvant.semaine && s.coach_id !== moi.id;
+  const tete = enTeteSeance(s);
+  if (estNouvelle) tete.append(etiquetteNouveau());
   carte.append(
-    enTeteSeance(s),
+    tete,
     s.titre ? el("p", { class: "seance-titre" }, s.titre) : "",
     s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : "",
     blocConsignes(s) || "",
