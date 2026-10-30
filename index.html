@@ -252,8 +252,23 @@ button.cocher:hover .case { background: var(--ok); }
 .photo-ligne { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 
 /* Photo d'une séance */
-.photo-seance { display: block; border-radius: 8px; overflow: hidden; background: var(--line); }
-.photo-seance img { display: block; width: 100%; max-height: 440px; object-fit: cover; }
+.photo-seance {
+  justify-self: start; display: block; width: 96px; height: 96px; padding: 0;
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--line); cursor: zoom-in;
+}
+.photo-seance img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* Photo agrandie par-dessus la page */
+.visionneuse {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+  background: rgba(0, 0, 0, .85); cursor: zoom-out;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.visionneuse img { max-width: 100%; max-height: 100%; border-radius: 8px; object-fit: contain; }
+.visionneuse button {
+  position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px));
+  background: rgba(255, 255, 255, .15); border: 0; color: #fff; border-radius: 50%; width: 40px; height: 40px; padding: 0; font-size: 22px;
+}
 .apercu-photo img { display: block; max-width: 100%; max-height: 240px; border-radius: 8px; }
 .photo-ligne > div { display: grid; gap: 6px; }
 
@@ -264,7 +279,7 @@ button.cocher:hover .case { background: var(--ok); }
   text-transform: none; letter-spacing: 0; font-size: 15px; color: var(--ink);
   border: 1px solid var(--line); border-radius: 99px; padding: 6px 14px; cursor: pointer;
 }
-.types input:checked + label { background: var(--coach); border-color: var(--coach); color: var(--surface); }
+.types input:checked + label { background: var(--track); border-color: var(--track); color: var(--surface); }
 .types input:focus-visible + label { outline: 2px solid var(--track); outline-offset: 2px; }
 .champs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; align-items: end; }
 .avec-unite { display: flex; align-items: center; gap: 8px; }
@@ -274,16 +289,46 @@ button.cocher:hover .case { background: var(--ok); }
   display: flex; align-items: center; gap: 10px; cursor: pointer;
   text-transform: none; letter-spacing: 0; font-size: 15px; font-weight: 400; color: var(--ink);
 }
-.option input { width: 18px; height: 18px; accent-color: var(--coach); }
+.option input { width: 18px; height: 18px; accent-color: var(--track); }
 .groupe-libre { display: grid; gap: 16px; }
-.apercu { border: 1px dashed var(--coach); border-radius: 8px; padding: 12px 14px; display: grid; gap: 4px; background: var(--bg); min-width: 0; }
+.apercu { border: 1px dashed var(--track); border-radius: 8px; padding: 12px 14px; display: grid; gap: 4px; background: var(--bg); min-width: 0; }
 .seance-haut { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .type-chip {
   font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
-  color: var(--coach); border: 1px solid var(--coach); border-radius: 4px; padding: 0 6px;
+  color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 6px;
 }
-.consignes { border-left: 3px solid var(--coach); padding: 2px 0 2px 12px; display: grid; gap: 2px; }
+.consignes { border-left: 3px solid var(--track); padding: 2px 0 2px 12px; display: grid; gap: 2px; }
 .consignes p { margin: 0; white-space: pre-line; overflow-wrap: anywhere; }
+
+/* Bandeau « Tu modifies la séance… » */
+.bandeau-modif {
+  margin: 0; padding: 10px 14px; border-radius: 8px; font-size: 15px; font-weight: 600;
+  background: color-mix(in srgb, var(--track) 12%, var(--surface)); border: 1px solid var(--track); color: var(--ink);
+}
+
+/* Boutons radio cachés (remplacés par des pastilles) : ils ne doivent pas élargir la page */
+.types, .couleurs, .rpe-ligne { position: relative; }
+.types input, .couleurs input, .rpe-ligne input { left: 0; top: 0; width: 1px; height: 1px; margin: 0; }
+
+/* Prénoms cliquables */
+button.personne { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-align: left; border-radius: 4px; }
+button.personne:hover b, button.personne:focus-visible b { text-decoration: underline; text-underline-offset: 3px; }
+button.avatar-lien { display: inline-flex; flex: none; }
+button.nom-lien { min-width: 0; overflow-wrap: anywhere; }
+button.nom-lien:hover .nom { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Réactions */
+.reactions-bloc { display: grid; gap: 6px; }
+.reactions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.reaction {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; min-height: 36px;
+  background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 99px;
+  font-size: 17px; font-weight: 600; line-height: 1;
+}
+.reaction .nb { font-size: 14px; font-variant-numeric: tabular-nums; }
+.reaction.active { border-color: var(--track); background: color-mix(in srgb, var(--track) 14%, var(--surface)); }
+@media (prefers-reduced-motion: no-preference) { .reaction:active { transform: scale(.94); } }
+.reactions-qui { font-size: 13px; color: var(--muted); }
 
 /* Commentaires sous les posts du fil */
 .commentaires { display: grid; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
@@ -357,7 +402,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
 
 /* Message d'accueil du coach */
 .hello { font-family: var(--display); font-weight: 700; font-size: 40px; line-height: 1; margin: 0; text-transform: uppercase; letter-spacing: .02em; overflow-wrap: anywhere; }
-.hello em { font-style: normal; color: var(--coach); }
+.hello em { font-style: normal; color: var(--track); }
 
 @media (prefers-reduced-motion: no-preference) {
   .card, .seance { animation: in .25s ease-out; }
@@ -500,6 +545,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
         <p class="vide" id="coach-aucun" hidden>Aucun athlète inscrit pour l'instant. Dès qu'un athlète aura ajouté son profil, il apparaîtra ici.</p>
 
         <form id="form-seance" novalidate>
+          <p class="bandeau-modif" id="info-modif" hidden></p>
           <div class="row">
             <div class="field">
               <label for="choix-athlete">Athlète</label>
@@ -547,11 +593,17 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
           </div>
           <p class="error" id="erreur-seance" hidden></p>
           <p class="ok" id="ok-seance" hidden></p>
-          <button type="submit" id="bouton-seance" style="justify-self:start">Envoyer la séance</button>
+          <div class="actions">
+            <button type="submit" id="bouton-seance">Envoyer la séance</button>
+            <button type="button" class="ghost" id="annuler-modif" hidden>Annuler la modification</button>
+          </div>
         </form>
       </section>
 
-      <h3 id="coach-titre-liste">Séances envoyées</h3>
+      <div class="entete-panneau" id="coach-entete-liste">
+        <h3 id="coach-titre-liste">Séances envoyées</h3>
+        <button type="button" class="lien" id="voir-profil-athlete">Voir son profil</button>
+      </div>
       <div class="seances" id="coach-seances"></div>
     </div>
 
@@ -568,6 +620,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
 
     <!-- ONGLET PROFIL -->
     <div class="panneau" id="panneau-profil" hidden>
+      <button type="button" class="ghost compact" id="profil-retour" style="justify-self:start" hidden>← Retour</button>
       <section class="card" id="profil-vue">
         <div class="profil-tete">
           <span id="profil-avatar"></span>
@@ -584,13 +637,13 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
       </section>
 
       <section class="card" id="profil-stats">
-        <h3>Mes statistiques</h3>
+        <h3 id="titre-stats">Mes statistiques</h3>
         <div class="tuiles-stats" id="stats-tuiles"><p class="muted">Chargement…</p></div>
       </section>
 
       <section class="card" id="profil-courbe">
         <div class="entete-panneau">
-          <h3>Mon évolution</h3>
+          <h3 id="titre-courbe">Mon évolution</h3>
           <div class="bascule petite" role="group" aria-label="Mesure affichée" id="courbe-choix">
             <button type="button" data-mesure="km" aria-pressed="true">Km</button>
             <button type="button" data-mesure="n" aria-pressed="false">Séances</button>
@@ -688,6 +741,7 @@ const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url
 const CHAMPS_SEANCE = "id, date, type, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
 const CHAMPS_COMMENTAIRE = "id, texte, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url, couleur)";
 const CHAMPS_FIL = CHAMPS_SEANCE
+  + ", reactions(auteur_id, emoji)"
   + ", athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url, couleur)"
   + ", commentaires(" + CHAMPS_COMMENTAIRE + ")";
 
@@ -752,6 +806,12 @@ const donnees = {
     return verifier(await sb.from("commentaires")
       .insert({ seance_id: seanceId, auteur_id: auteurId, texte })
       .select(CHAMPS_COMMENTAIRE).single());
+  },
+  async reagir(seanceId, auteurId, emoji) {
+    verifier(await sb.from("reactions").insert({ seance_id: seanceId, auteur_id: auteurId, emoji }));
+  },
+  async retirerReaction(seanceId, auteurId, emoji) {
+    verifier(await sb.from("reactions").delete().eq("seance_id", seanceId).eq("auteur_id", auteurId).eq("emoji", emoji));
   },
   async supprimerCommentaire(id) { verifier(await sb.from("commentaires").delete().eq("id", id)); },
 
@@ -1139,10 +1199,24 @@ function champPhoto(prefixe, urlExistante) {
     },
   };
 }
+// Petite vignette ; un clic l'agrandit par-dessus la page
 function photoDeSeance(s, auteur) {
   if (!s.photo_url) return null;
-  return el("a", { class: "photo-seance", href: s.photo_url, target: "_blank", rel: "noopener" },
-    el("img", { src: s.photo_url, alt: "Photo de la séance" + (auteur ? " de " + nomComplet(auteur) : ""), loading: "lazy" }));
+  const alt = "Photo de la séance" + (auteur ? " de " + nomComplet(auteur) : "");
+  const b = el("button", { type: "button", class: "photo-seance", "aria-label": "Agrandir la photo" },
+    el("img", { src: s.photo_url, alt, loading: "lazy" }));
+  b.addEventListener("click", () => ouvrirVisionneuse(s.photo_url, alt));
+  return b;
+}
+function ouvrirVisionneuse(src, alt) {
+  const fermer = el("button", { type: "button", "aria-label": "Fermer" }, "×");
+  const fond = el("div", { class: "visionneuse", role: "dialog", "aria-label": alt }, [el("img", { src, alt }), fermer]);
+  const quitter = () => { fond.remove(); document.removeEventListener("keydown", touche); };
+  const touche = (e) => { if (e.key === "Escape") quitter(); };
+  fond.addEventListener("click", quitter);
+  document.addEventListener("keydown", touche);
+  document.body.append(fond);
+  fermer.focus();
 }
 
 async function preparerPhoto(fichier) {
@@ -1232,7 +1306,13 @@ function ouvrirProfil(profil) {
   aller(liste.includes(memorise) ? memorise : "fil");
 }
 
-function aller(o) {
+// Profil affiché dans l'onglet Profil : le sien, ou celui de quelqu'un d'autre
+let profilVu = null;
+let retourProfil = null; // { onglet, defilement } pour revenir là où on était
+
+function aller(o, personne = null) {
+  profilVu = o === "profil" ? personne : null;
+  if (!personne) retourProfil = null;
   onglet = o;
   ecrire("couloir-onglet", o);
   ["fil", "semaine", "planifier", "trophees", "profil"].forEach((p) => ($("panneau-" + p).hidden = p !== o));
@@ -1312,6 +1392,38 @@ $("annuler-creation").addEventListener("click", afficherChoix);
 const PAR_PAGE = 15;
 let pageFil = 0;
 
+// Ouvre le profil de quelqu'un ; « Retour » ramène exactement où on était
+async function voirProfil(p) {
+  if (!p || !p.id) return;
+  if (moi && p.id === moi.id) return aller("profil");
+  let complet = profilsConnus.find((x) => x.id === p.id);
+  if (!complet) { try { complet = await donnees.profil(p.id); } catch (e) { complet = null; } }
+  if (!complet) complet = p;
+  const retour = onglet !== "profil" ? { onglet, defilement: window.scrollY } : retourProfil;
+  aller("profil", complet);
+  retourProfil = retour;
+  $("profil-retour").hidden = !retourProfil;
+}
+$("profil-retour").addEventListener("click", () => {
+  const r = retourProfil;
+  if (!r) return aller("profil");
+  // On réaffiche l'onglet précédent tel quel, sans le recharger
+  profilVu = null; retourProfil = null; onglet = r.onglet;
+  ["fil", "semaine", "planifier", "trophees", "profil"].forEach((x) => ($("panneau-" + x).hidden = x !== r.onglet));
+  $("nav-int").querySelectorAll("button").forEach((b) => {
+    if (b.dataset.onglet === r.onglet) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
+  $("panneau-profil").style.removeProperty("--track");
+  window.scrollTo(0, r.defilement);
+});
+
+// Un prénom (et son avatar) cliquable qui ouvre le profil de la personne
+function lienPersonne(p, enfants, classe = "personne") {
+  const b = el("button", { type: "button", class: classe, title: "Voir le profil de " + nomComplet(p) }, enfants);
+  b.addEventListener("click", () => voirProfil(p));
+  return b;
+}
+
 function carteFil(s) {
   const auteur = s.athlete || {};
   const quoi = !s.coach_id ? "a publié une séance"
@@ -1319,9 +1431,9 @@ function carteFil(s) {
     : "a fait la séance de " + nomComplet(s.coach);
   const carte = el("article", { class: "seance post" }, [
     el("div", { class: "post-tete" }, [
-      avatarEl(auteur, "petit"),
+      lienPersonne(auteur, avatarEl(auteur, "petit"), "personne avatar-lien"),
       el("div", { class: "post-qui" }, [
-        el("b", {}, nomComplet(auteur)),
+        lienPersonne(auteur, el("b", {}, nomComplet(auteur))),
         el("div", { class: "muted petit" }, quoi + " · " + ilYa(s.fait_le)),
       ]),
     ]),
@@ -1342,8 +1454,66 @@ function carteFil(s) {
     });
     carte.append(b);
   }
-  carte.append(zoneCommentaires(s));
+  carte.append(zoneReactions(s), zoneCommentaires(s));
   return carte;
+}
+
+// Réactions sous un post : 👏 🔥 💪, un clic pour ajouter ou retirer la sienne
+const REACTIONS = { bravo: { emoji: "👏", nom: "Bravo" }, feu: { emoji: "🔥", nom: "En feu" }, muscle: { emoji: "💪", nom: "Costaud" } };
+function zoneReactions(s) {
+  const liste = (s.reactions || []).slice();
+  const zone = el("div", { class: "reactions" });
+  const erreur = el("p", { class: "error", hidden: "" });
+
+  function prenomsDe(cle) {
+    return liste.filter((r) => r.emoji === cle).map((r) => {
+      if (moi && r.auteur_id === moi.id) return "toi";
+      const p = profilsConnus.find((x) => x.id === r.auteur_id);
+      return p ? p.prenom : "quelqu'un";
+    });
+  }
+
+  function rendre() {
+    zone.replaceChildren(...Object.entries(REACTIONS).map(([cle, r]) => {
+      const qui = prenomsDe(cle);
+      const aMoi = moi && liste.some((x) => x.emoji === cle && x.auteur_id === moi.id);
+      const b = el("button", {
+        type: "button", class: "reaction" + (aMoi ? " active" : ""), "aria-pressed": String(!!aMoi),
+        title: qui.length ? r.nom + " : " + qui.join(", ") : r.nom,
+        "aria-label": r.nom + (qui.length ? ", " + qui.length : ""),
+      }, [el("span", { "aria-hidden": "true" }, r.emoji), qui.length ? el("span", { class: "nb" }, String(qui.length)) : null]);
+      b.addEventListener("click", () => basculer(cle, aMoi));
+      return b;
+    }));
+    const tous = [...new Set(liste.map((r) => r.auteur_id))];
+    if (tous.length) {
+      const noms = tous.map((id) => (moi && id === moi.id ? "toi" : (profilsConnus.find((x) => x.id === id) || {}).prenom)).filter(Boolean);
+      zone.append(el("span", { class: "reactions-qui" }, noms.slice(0, 3).join(", ") + (noms.length > 3 ? " et " + (noms.length - 3) + " autre" + (noms.length > 4 ? "s" : "") : "")));
+    }
+  }
+
+  async function basculer(cle, aMoi) {
+    if (!moi) return;
+    erreur.hidden = true;
+    // Affichage immédiat, puis enregistrement
+    if (aMoi) liste.splice(liste.findIndex((x) => x.emoji === cle && x.auteur_id === moi.id), 1);
+    else liste.push({ emoji: cle, auteur_id: moi.id });
+    rendre();
+    try {
+      if (aMoi) await donnees.retirerReaction(s.id, moi.id, cle);
+      else await donnees.reagir(s.id, moi.id, cle);
+    } catch (e) {
+      if (!aMoi && /duplicate key/i.test(e.message || "")) return; // déjà enregistrée
+      if (aMoi) liste.push({ emoji: cle, auteur_id: moi.id });
+      else liste.splice(liste.findIndex((x) => x.emoji === cle && x.auteur_id === moi.id), 1);
+      rendre();
+      erreur.textContent = messageErreur(e);
+      erreur.hidden = false;
+    }
+  }
+
+  rendre();
+  return el("div", { class: "reactions-bloc" }, [zone, erreur]);
 }
 
 // Commentaires sous un post : les 2 derniers, puis « Voir les N commentaires »
@@ -1366,9 +1536,9 @@ function zoneCommentaires(s) {
       meta.append(sup);
     }
     return el("div", { class: "com" }, [
-      avatarEl(c.auteur, "mini"),
+      lienPersonne(c.auteur, avatarEl(c.auteur, "mini"), "personne avatar-lien"),
       el("div", { class: "com-corps" }, [
-        el("p", { class: "com-texte" }, [el("b", {}, nomComplet(c.auteur)), " ", c.texte]),
+        el("p", { class: "com-texte" }, [lienPersonne(c.auteur, el("b", {}, nomComplet(c.auteur))), " ", c.texte]),
         meta,
       ]),
     ]);
@@ -1620,6 +1790,7 @@ const choixAthlete = $("choix-athlete");
 let athletes = [];
 
 async function afficherPlanifier() {
+  if (seanceEnModif) finirModif();
   $("coach-prenom").textContent = moi.prenom;
   afficherMessage("ok-seance", "");
   afficherMessage("erreur-seance", "");
@@ -1638,7 +1809,7 @@ async function afficherPlanifier() {
   const aucun = athletes.length === 0;
   $("coach-aucun").hidden = !aucun;
   $("form-seance").hidden = aucun;
-  $("coach-titre-liste").hidden = aucun;
+  $("coach-entete-liste").hidden = aucun;
   $("coach-seances").hidden = aucun;
   if (!aucun) afficherSeancesCoach();
 }
@@ -1655,12 +1826,17 @@ function carteCoach(s) {
     s.fait ? photoDeSeance(s) : null,
     s.fait && s.commentaire ? el("blockquote", { class: "commentaire" }, s.commentaire) : null,
   ]);
-  const b = el("button", { class: "lien petit", type: "button", style: "justify-self:start" }, "Supprimer");
+  const modifier = el("button", { class: "lien petit", type: "button" }, "Modifier");
+  modifier.addEventListener("click", () => commencerModif(s));
+  const b = el("button", { class: "lien petit", type: "button" }, "Supprimer");
   b.addEventListener("click", async () => {
-    try { await pendant(b, "Suppression…", () => donnees.supprimerSeance(s.id)); afficherSeancesCoach(); }
-    catch (e) { afficherMessage("erreur-seance", messageErreur(e)); }
+    try {
+      await pendant(b, "Suppression…", () => donnees.supprimerSeance(s.id));
+      if (seanceEnModif && seanceEnModif.id === s.id) finirModif();
+      afficherSeancesCoach();
+    } catch (e) { afficherMessage("erreur-seance", messageErreur(e)); }
   });
-  carte.append(b);
+  carte.append(el("div", { class: "actions" }, [modifier, b]));
   return carte;
 }
 
@@ -1669,6 +1845,7 @@ async function afficherSeancesCoach() {
   const zone = $("coach-seances");
   if (!athlete) { zone.replaceChildren(); return; }
   $("coach-titre-liste").textContent = athlete.estMoi ? "Mes propres séances" : "Séances de " + athlete.prenom;
+  $("voir-profil-athlete").hidden = !!athlete.estMoi;
   zone.replaceChildren(el("p", { class: "muted" }, "Chargement…"));
   try {
     const seances = await donnees.seancesDuCoachPour(athlete.id);
@@ -1683,6 +1860,54 @@ async function afficherSeancesCoach() {
 }
 
 choixAthlete.addEventListener("change", () => { afficherMessage("ok-seance", ""); afficherSeancesCoach(); });
+$("voir-profil-athlete").addEventListener("click", () => {
+  const a = athletes.find((x) => x.id === choixAthlete.value);
+  if (a && !a.estMoi) voirProfil(a);
+});
+
+/* ---------- Modifier une séance déjà envoyée ---------- */
+let seanceEnModif = null;
+
+function choisirType(cle) {
+  typeChoisi = cle;
+  const radio = $("type-" + cle);
+  if (radio) radio.checked = true;
+  construireChamps();
+}
+
+// Charge la séance dans le formulaire, en mode « séance libre » pour pouvoir tout retoucher
+function commencerModif(s) {
+  seanceEnModif = s;
+  choisirType("libre");
+  $("seance-titre").value = s.titre || "";
+  $("seance-contenu").value = s.contenu || "";
+  $("seance-date").value = s.date || "";
+  $("seance-consignes").value = s.consignes || "";
+  choixAthlete.disabled = true;
+  const athlete = athletes.find((a) => a.id === choixAthlete.value);
+  $("info-modif").textContent = "Tu modifies la séance « " + (s.titre || "sans titre") + " »"
+    + (athlete && !athlete.estMoi ? " de " + athlete.prenom : "") + ".";
+  $("info-modif").hidden = false;
+  $("bouton-seance").textContent = "Enregistrer les modifications";
+  $("annuler-modif").hidden = false;
+  afficherMessage("ok-seance", "");
+  afficherMessage("erreur-seance", "");
+  $("form-seance").scrollIntoView({ behavior: "smooth", block: "start" });
+  $("seance-titre").focus({ preventScroll: true });
+}
+
+function finirModif() {
+  seanceEnModif = null;
+  choixAthlete.disabled = false;
+  $("info-modif").hidden = true;
+  $("bouton-seance").textContent = "Envoyer la séance";
+  $("annuler-modif").hidden = true;
+  $("seance-titre").value = "";
+  $("seance-contenu").value = "";
+  $("seance-consignes").value = "";
+  choisirType(MODELES[lire("couloir-type")] ? lire("couloir-type") : "footing");
+}
+$("annuler-modif").addEventListener("click", () => { finirModif(); afficherMessage("ok-seance", ""); });
 
 $("form-seance").addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -1693,6 +1918,22 @@ $("form-seance").addEventListener("submit", async (event) => {
   const date = $("seance-date").value || null;
   const consignes = $("seance-consignes").value.trim() || null;
   if (!titre && !contenu) return afficherMessage("erreur-seance", "Donne au moins un titre ou un contenu à la séance.");
+
+  if (seanceEnModif) {
+    try {
+      // En mode libre, on garde le type d'origine (footing, côtes…) pour l'étiquette
+      const type = typeChoisi === "libre" ? (seanceEnModif.type || "libre") : typeChoisi;
+      await pendant($("bouton-seance"), "Enregistrement…", () =>
+        donnees.majSeance(seanceEnModif.id, { date, type, titre: titre || null, contenu: contenu || null, consignes }));
+      finirModif();
+      afficherMessage("ok-seance", "Séance modifiée.");
+      afficherSeancesCoach();
+    } catch (e) {
+      afficherMessage("erreur-seance", messageErreur(e));
+    }
+    return;
+  }
+
   try {
     await pendant($("bouton-seance"), "Envoi…", () => donnees.envoyerSeance({
       athlete_id: athlete.id, coach_id: moi.id, date, type: typeChoisi,
@@ -1715,7 +1956,11 @@ function construireTypes() {
   $("types").replaceChildren(...Object.entries(MODELES).flatMap(([cle, m]) => {
     const input = el("input", { type: "radio", name: "type-seance", id: "type-" + cle, value: cle });
     if (cle === typeChoisi) input.checked = true;
-    input.addEventListener("change", () => { typeChoisi = cle; ecrire("couloir-type", cle); construireChamps(); });
+    input.addEventListener("change", () => {
+      typeChoisi = cle;
+      if (!seanceEnModif) ecrire("couloir-type", cle);
+      construireChamps();
+    });
     return [input, el("label", { for: "type-" + cle }, m.nom)];
   }));
   construireChamps();
@@ -1933,15 +2178,15 @@ function carteTrophee(t, podium) {
   }
   const [premier, ...suivants] = podium;
   carte.append(el("div", { class: "gagnant" }, [
-    avatarEl(premier.profil, "petit"),
-    el("b", {}, nomComplet(premier.profil)),
+    lienPersonne(premier.profil, avatarEl(premier.profil, "petit"), "personne avatar-lien"),
+    lienPersonne(premier.profil, el("b", {}, nomComplet(premier.profil))),
     el("span", { class: "valeur" }, t.format(premier.valeur)),
   ]));
   if (suivants.length) {
     carte.append(el("ol", { class: "podium" }, suivants.map((e, i) => el("li", {}, [
       el("span", { class: "rang r" + (i + 2), "aria-label": (i + 2) + "e" }),
-      avatarEl(e.profil, "mini"),
-      el("span", { class: "nom" }, nomComplet(e.profil)),
+      lienPersonne(e.profil, avatarEl(e.profil, "mini"), "personne avatar-lien"),
+      lienPersonne(e.profil, el("span", { class: "nom" }, nomComplet(e.profil)), "personne nom-lien"),
       el("span", { class: "v" }, t.format(e.valeur)),
     ]))));
   }
@@ -2066,34 +2311,46 @@ let photoEnAttente = null;   // la nouvelle photo choisie, pas encore envoyée
 let apercuUrl = null;
 
 async function afficherProfil() {
+  const p = profilVu || moi;
+  const estMoi = p.id === moi.id;
+  $("profil-retour").hidden = estMoi || !retourProfil;
+  // Le profil de quelqu'un d'autre s'affiche dans sa couleur à lui
+  if (estMoi) $("panneau-profil").style.removeProperty("--track");
+  else $("panneau-profil").style.setProperty("--track", couleurDe(p));
+  $("profil-modifier").hidden = !estMoi;
+  $("titre-stats").textContent = estMoi ? "Mes statistiques" : "Statistiques de " + p.prenom;
+  $("titre-courbe").textContent = estMoi ? "Mon évolution" : "Évolution de " + p.prenom;
+
   $("profil-form").hidden = true;
   $("profil-vue").hidden = false;
-  $("profil-avatar").replaceChildren(avatarEl(moi, "grand"));
-  $("profil-nom").textContent = nomComplet(moi);
-  $("profil-discipline").textContent = moi.discipline || "";
+  $("profil-avatar").replaceChildren(avatarEl(p, "grand"));
+  $("profil-nom").textContent = nomComplet(p);
+  $("profil-discipline").textContent = p.discipline || "";
   const desc = $("profil-description");
-  desc.textContent = moi.description || "Pas encore de description. Présente-toi en quelques mots !";
-  desc.classList.toggle("muted", !moi.description);
+  desc.textContent = p.description || (estMoi ? "Pas encore de description. Présente-toi en quelques mots !" : "Pas encore de description.");
+  desc.classList.toggle("muted", !p.description);
   $("profil-stats").hidden = false;
   $("profil-courbe").hidden = false;
   $("mes-trophees").replaceChildren();
-  $("stats-tuiles").replaceChildren(el("p", { class: "muted" }, "Calcul de tes statistiques…"));
+  $("stats-tuiles").replaceChildren(el("p", { class: "muted" }, "Calcul des statistiques…"));
   $("courbe").replaceChildren();
 
   try {
     const groupe = await chargerGroupe();
+    if (onglet !== "profil" || (profilVu || moi).id !== p.id) return; // on a changé de profil entre-temps
     const { stats } = calculerStats(groupe);
-    const st = stats.find((x) => x.profil.id === moi.id) || statsPersonne([]);
-    afficherTuilesStats(st);
+    const st = stats.find((x) => x.profil.id === p.id) || statsPersonne([]);
+    afficherTuilesStats(st, estMoi);
     statsCourbe = st;
     dessinerCourbe();
-    afficherMesTrophees(stats);
+    afficherMesTrophees(stats, p);
   } catch (e) {
     $("stats-tuiles").replaceChildren(el("p", { class: "error" }, messageErreur(e)));
   }
 }
 
-function afficherTuilesStats(st) {
+function afficherTuilesStats(st, estMoi = true) {
+  const ma = estMoi ? "ma " : "";
   const arrondi = (n) => (Math.round(n * 10) / 10).toLocaleString("fr-FR");
   const tuiles = [
     [String(st.n), "séance" + (st.n > 1 ? "s" : "") + " faite" + (st.n > 1 ? "s" : "") + " au total"],
@@ -2101,8 +2358,8 @@ function afficherTuilesStats(st) {
     [formatKm(st.kmParSemaine), "par semaine en moyenne"],
     [formatKm(st.w.km), "cette semaine"],
     [formatKm(st.km), "au total"],
-    [st.maxKm ? formatKm(st.maxKm) : "–", "ma plus longue sortie"],
-    [st.maxSemaineKm ? formatKm(st.maxSemaineKm) : "–", "ma plus grosse semaine"],
+    [st.maxKm ? formatKm(st.maxKm) : "–", ma + "plus longue sortie"],
+    [st.maxSemaineKm ? formatKm(st.maxSemaineKm) : "–", ma + "plus grosse semaine"],
     [st.min ? enMinutes(st.min) : "–", "d'entraînement au total"],
     [st.rpeMoyen ? arrondi(st.rpeMoyen) + "/10" : "–", "difficulté moyenne ressentie"],
     [String(st.serieActuelle), "semaine" + (st.serieActuelle > 1 ? "s" : "") + " d'affilée en ce moment"],
@@ -2111,11 +2368,11 @@ function afficherTuilesStats(st) {
     el("div", { class: "tuile-stat" }, [el("span", { class: "chiffre" }, chiffre), el("span", { class: "quoi" }, quoi)])));
 }
 
-function afficherMesTrophees(stats) {
+function afficherMesTrophees(stats, p = moi) {
   // Un badge par trophée détenu, en précisant la période
   const gagnes = [];
   TROPHEES.forEach((t) => {
-    const premier = (periode) => { const p = classement(stats, t, periode); return p.length > 0 && p[0].profil.id === moi.id; };
+    const premier = (periode) => { const c = classement(stats, t, periode); return c.length > 0 && c[0].profil.id === p.id; };
     const semaine = premier("semaine"), toujours = premier("toujours");
     if (semaine && toujours) gagnes.push(t.nom + " · semaine et depuis toujours");
     else if (toujours) gagnes.push(t.nom + " · depuis toujours");
