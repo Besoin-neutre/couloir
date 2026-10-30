@@ -337,6 +337,31 @@ button.cocher:hover .case { background: var(--ok); }
 .installer img { flex: none; border-radius: 11px; }
 .installer > div { display: grid; gap: 6px; min-width: 0; }
 
+/* Objectifs de la semaine */
+.objectifs { display: grid; gap: 14px; }
+.objectif { display: grid; gap: 6px; }
+.objectif-ligne { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.objectif-ligne b { font-size: 16px; }
+.objectif-chiffres { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 15px; }
+.objectif-chiffres strong { color: var(--ink); font-family: var(--display); font-size: 22px; }
+.objectif .barre { height: 10px; }
+.objectif .barre span { background: var(--track); }
+.objectif.atteint .barre span { background: var(--ok); }
+.atteint-texte { color: var(--ok); font-weight: 700; font-size: 14px; }
+#sem-objectifs { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+
+/* Records personnels */
+.records { list-style: none; margin: 0; padding: 0; display: grid; }
+.records li { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.records li:last-child { border-bottom: 0; }
+.records .epreuve { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.records .perf { font-family: var(--display); font-weight: 700; font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; text-align: right; }
+.records .quand { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
+.records-edit { display: grid; gap: 12px; }
+.record-ligne { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto; gap: 8px; align-items: end; padding-bottom: 12px; border-bottom: 1px dashed var(--line); }
+.record-ligne .large { grid-column: 1 / 3; }
+.record-ligne .retirer-record { width: 40px; height: 44px; padding: 0; font-size: 20px; }
+
 /* Prénoms cliquables */
 button.personne { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-align: left; border-radius: 4px; }
 button.personne:hover b, button.personne:focus-visible b { text-decoration: underline; text-underline-offset: 3px; }
@@ -563,6 +588,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
         <div class="barre"><span id="sem-barre"></span></div>
         <p class="muted petit" id="sem-compte"></p>
       </div>
+      <div class="objectifs" id="sem-objectifs" hidden></div>
       <div class="seances" id="sem-liste"></div>
     </div>
 
@@ -665,6 +691,16 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
         <button type="button" class="ghost" id="profil-modifier" style="justify-self:start">Modifier mon profil</button>
       </section>
 
+      <section class="card" id="profil-objectifs">
+        <h3 id="titre-objectifs">Mes objectifs de la semaine</h3>
+        <div class="objectifs" id="objectifs-contenu"></div>
+      </section>
+
+      <section class="card" id="profil-records">
+        <h3 id="titre-records">Mes records</h3>
+        <div id="records-contenu"></div>
+      </section>
+
       <section class="card" id="profil-stats">
         <h3 id="titre-stats">Mes statistiques</h3>
         <div class="tuiles-stats" id="stats-tuiles"><p class="muted">Chargement…</p></div>
@@ -721,6 +757,25 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
           <textarea id="pf-description" maxlength="300" placeholder="Objectifs de la saison, records, ce que tu aimes courir…"></textarea>
           <p class="aide" id="pf-compteur">0 / 300</p>
         </div>
+        <fieldset>
+          <legend class="label">Mes objectifs chaque semaine (facultatif)</legend>
+          <div class="row">
+            <div class="field">
+              <label for="pf-obj-km">Kilomètres</label>
+              <input id="pf-obj-km" type="text" inputmode="decimal" placeholder="20">
+            </div>
+            <div class="field">
+              <label for="pf-obj-seances">Séances</label>
+              <input id="pf-obj-seances" type="text" inputmode="numeric" placeholder="3">
+            </div>
+          </div>
+          <p class="aide">Laisse vide si tu ne veux pas d'objectif. Une barre de progression apparaîtra dans ton profil et dans l'onglet Semaine.</p>
+        </fieldset>
+        <fieldset>
+          <legend class="label">Mes records</legend>
+          <div class="records-edit" id="pf-records"></div>
+          <button type="button" class="ghost compact" id="pf-ajout-record" style="justify-self:start">+ Ajouter un record</button>
+        </fieldset>
         <p class="error" id="erreur-pf" hidden></p>
         <div class="actions">
           <button type="submit" id="bouton-pf">Enregistrer</button>
@@ -766,7 +821,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
    ========================================================= */
 function verifier({ data, error }) { if (error) throw error; return data; }
 
-const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url, couleur";
+const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url, couleur, objectif_km, objectif_seances, records";
 const CHAMPS_SEANCE = "id, cree_le, date, type, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
 const CHAMPS_COMMENTAIRE = "id, texte, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url, couleur)";
 const CHAMPS_FIL = CHAMPS_SEANCE
@@ -790,6 +845,10 @@ const donnees = {
   },
   async athletes() {
     return verifier(await sb.from("profils").select("id, prenom, nom, discipline").eq("role", "Athlète").order("prenom"));
+  },
+  async seancesFaitesDe(id) {
+    return verifier(await sb.from("seances").select("id, date, fait_le, type, ressenti, distance_km, duree_min")
+      .eq("athlete_id", id).eq("fait", true));
   },
   async nbSeancesFaites(id) {
     const { count, error } = await sb.from("seances").select("id", { count: "exact", head: true }).eq("athlete_id", id).eq("fait", true);
@@ -1889,6 +1948,7 @@ async function chargerSemaine() {
       seances.forEach((s) => liste.append(carteSemaine(s)));
     }
     majProgression();
+    majObjectifsSemaine();
   } catch (e) {
     liste.replaceChildren(el("p", { class: "error" }, messageErreur(e)));
   }
@@ -1935,7 +1995,7 @@ function carteSemaine(s) {
     const decocher = el("button", { type: "button", class: "lien petit" }, "Marquer comme non faite");
     decocher.addEventListener("click", async () => {
       const maj = { fait: false, fait_le: null, ressenti: null, commentaire: null, distance_km: null, duree_min: null, photo_url: null };
-      try { await pendant(decocher, "…", () => donnees.majSeance(s.id, maj)); Object.assign(s, maj); afficherEtat(); majProgression(); }
+      try { await pendant(decocher, "…", () => donnees.majSeance(s.id, maj)); Object.assign(s, maj); afficherEtat(); majProgression(); majObjectifsSemaine(); }
       catch (e) { zone.append(el("p", { class: "error" }, messageErreur(e))); }
     });
     zone.append(el("div", { class: "actions" }, [modifier, decocher]));
@@ -1969,6 +2029,7 @@ function carteSemaine(s) {
         Object.assign(s, maj);
         afficherEtat();
         majProgression();
+        majObjectifsSemaine();
       } catch (e) {
         erreur.textContent = messageErreur(e);
         erreur.hidden = false;
@@ -2514,6 +2575,110 @@ window.addEventListener("resize", () => {
   attenteRedimension = setTimeout(() => { if (onglet === "profil") dessinerCourbe(); }, 150);
 });
 
+/* ---------- Objectifs de la semaine ---------- */
+function barreObjectif(nom, fait, cible, format) {
+  const pct = Math.min(100, Math.round((fait / cible) * 100));
+  const atteint = fait >= cible;
+  const barre = el("span");
+  barre.style.width = pct + "%";
+  return el("div", { class: "objectif" + (atteint ? " atteint" : "") }, [
+    el("div", { class: "objectif-ligne" }, [
+      el("b", {}, nom),
+      el("span", { class: "objectif-chiffres" }, [el("strong", {}, format(fait)), " / " + format(cible)]),
+    ]),
+    el("div", { class: "barre", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(pct), "aria-label": nom + " : " + pct + " %" }, barre),
+    atteint ? el("span", { class: "atteint-texte" }, "✓ Objectif atteint !") : el("span", { class: "muted petit" }, "Encore " + format(Math.max(0, Math.round((cible - fait) * 10) / 10)) + " pour y arriver"),
+  ]);
+}
+// Les barres de la semaine w ({ km, n }) pour le profil p ; null s'il n'a pas d'objectif
+function barresObjectifs(p, w) {
+  const barres = [];
+  if (p.objectif_km > 0) barres.push(barreObjectif("Kilomètres", Math.round(w.km * 10) / 10, Number(p.objectif_km), formatKm));
+  if (p.objectif_seances > 0) barres.push(barreObjectif("Séances", w.n, p.objectif_seances, (n) => pluriel(n, "séance")));
+  return barres.length ? barres : null;
+}
+
+// Dans l'onglet Semaine : les objectifs de la semaine affichée
+async function majObjectifsSemaine() {
+  const zone = $("sem-objectifs");
+  if (!moi || decalageSemaine > 0 || !(moi.objectif_km > 0 || moi.objectif_seances > 0)) { zone.hidden = true; return; }
+  try {
+    const st = statsPersonne(await donnees.seancesFaitesDe(moi.id));
+    const lundi = lundiDe(new Date());
+    lundi.setDate(lundi.getDate() + 7 * decalageSemaine);
+    const w = st.parSemaine[isoLocal(lundi)] || semaineVide();
+    zone.replaceChildren(el("span", { class: "label" }, "Mes objectifs"), ...barresObjectifs(moi, w));
+    zone.hidden = false;
+  } catch (e) { zone.hidden = true; }
+}
+
+/* ---------- Records personnels ---------- */
+// Épreuves proposées : surtout de la course (« Autre… » permet d'en écrire une autre)
+const EPREUVES = ["400 m", "3 km", "5 km", "10 km", "21 km (semi)", "42 km (marathon)"];
+const EXEMPLES_PERF = {
+  "400 m": "58\"30", "3 km": "11:20", "5 km": "19:58", "10 km": "42:15",
+  "21 km (semi)": "1:35:20", "42 km (marathon)": "3:25:00",
+};
+function exemplePerf(epreuve) { return EXEMPLES_PERF[epreuve] || "Ta performance"; }
+function listeRecords(records) {
+  const tries = (records || []).slice().sort((a, b) => {
+    const ia = EPREUVES.indexOf(a.epreuve), ib = EPREUVES.indexOf(b.epreuve);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  return el("ul", { class: "records" }, tries.map((r) => el("li", {}, [
+    el("span", { class: "epreuve" }, r.epreuve),
+    el("span", { class: "perf" }, r.perf),
+    r.date ? el("span", { class: "quand" }, "Le " + dateLocale(r.date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })) : null,
+  ])));
+}
+
+// Une ligne modifiable : épreuve (ou « Autre »), performance, date
+let compteurRecords = 0;
+function ligneRecord(r = {}) {
+  const n = ++compteurRecords;
+  const connue = !r.epreuve || EPREUVES.includes(r.epreuve);
+  const choix = el("select", { id: "rec-ep-" + n }, [
+    ...EPREUVES.map((e) => el("option", { value: e }, e)),
+    el("option", { value: "autre" }, "Autre…"),
+  ]);
+  choix.value = connue ? (r.epreuve || "5 km") : "autre";
+  const autre = el("input", { id: "rec-autre-" + n, maxlength: "40", placeholder: "Nom de l'épreuve" });
+  autre.value = connue ? "" : r.epreuve;
+  const perf = el("input", { id: "rec-perf-" + n, maxlength: "20" });
+  perf.value = r.perf || "";
+  const date = el("input", { id: "rec-date-" + n, type: "date" });
+  date.value = r.date || "";
+  const retirer = el("button", { type: "button", class: "ghost retirer-record", "aria-label": "Retirer ce record" }, "×");
+  const champAutre = el("div", { class: "field large" }, [el("label", { for: autre.id }, "Quelle épreuve ?"), autre]);
+  const maj = () => { champAutre.hidden = choix.value !== "autre"; perf.placeholder = exemplePerf(choix.value); };
+  choix.addEventListener("change", maj);
+
+  const ligne = el("div", { class: "record-ligne" }, [
+    el("div", { class: "field" }, [el("label", { for: choix.id }, "Épreuve"), choix]),
+    el("div", { class: "field" }, [el("label", { for: perf.id }, "Performance"), perf]),
+    retirer,
+    champAutre,
+    el("div", { class: "field large" }, [el("label", { for: date.id }, "Date (facultatif)"), date]),
+  ]);
+  retirer.addEventListener("click", () => ligne.remove());
+  ligne.lire = () => {
+    const epreuve = choix.value === "autre" ? autre.value.trim() : choix.value;
+    const p = perf.value.trim();
+    if (!p && (choix.value !== "autre" || !epreuve)) return null; // ligne vide : ignorée
+    if (!p) throw erreurLisible("Indique la performance pour « " + epreuve + " ».");
+    if (!epreuve) throw erreurLisible("Indique le nom de l'épreuve pour la performance « " + p + " ».");
+    return { epreuve, perf: p, date: date.value || null };
+  };
+  maj();
+  return ligne;
+}
+$("pf-ajout-record").addEventListener("click", () => {
+  if ($("pf-records").children.length >= 20) return;
+  const l = ligneRecord();
+  $("pf-records").append(l);
+  l.querySelector("select").focus();
+});
+
 /* =========================================================
    9. ONGLET PROFIL : photo, description, statistiques
    ========================================================= */
@@ -2542,6 +2707,22 @@ async function afficherProfil() {
   $("profil-stats").hidden = false;
   $("profil-courbe").hidden = false;
   $("mes-trophees").replaceChildren();
+
+  // Records
+  $("titre-records").textContent = estMoi ? "Mes records" : "Records de " + p.prenom;
+  const records = Array.isArray(p.records) ? p.records : [];
+  $("profil-records").hidden = !estMoi && records.length === 0;
+  $("records-contenu").replaceChildren(records.length
+    ? listeRecords(records)
+    : el("p", { class: "vide" }, "Pas encore de record. Ajoute tes meilleures performances avec « Modifier mon profil »."));
+
+  // Objectifs (les barres arrivent avec les statistiques)
+  $("titre-objectifs").textContent = estMoi ? "Mes objectifs de la semaine" : "Objectifs de " + p.prenom + " cette semaine";
+  const aDesObjectifs = p.objectif_km > 0 || p.objectif_seances > 0;
+  $("profil-objectifs").hidden = !estMoi && !aDesObjectifs;
+  $("objectifs-contenu").replaceChildren(aDesObjectifs
+    ? el("p", { class: "muted" }, "Calcul…")
+    : el("p", { class: "vide" }, "Pas d'objectif pour l'instant. Fixe-toi un nombre de kilomètres ou de séances par semaine avec « Modifier mon profil »."));
   $("stats-tuiles").replaceChildren(el("p", { class: "muted" }, "Calcul des statistiques…"));
   $("courbe").replaceChildren();
 
@@ -2554,6 +2735,8 @@ async function afficherProfil() {
     statsCourbe = st;
     dessinerCourbe();
     afficherMesTrophees(stats, p);
+    const barres = barresObjectifs(p, st.w);
+    if (barres) $("objectifs-contenu").replaceChildren(...barres);
   } catch (e) {
     $("stats-tuiles").replaceChildren(el("p", { class: "error" }, messageErreur(e)));
   }
@@ -2609,12 +2792,14 @@ $("profil-modifier").addEventListener("click", () => {
   $("pf-discipline").value = moi.discipline || DISCIPLINES[0];
   $("pf-description").value = moi.description || "";
   lireCouleurPf = choixCouleur($("couleurs-pf"), "couleur-pf", cleCouleur(moi), moi.id);
+  $("pf-obj-km").value = moi.objectif_km ? String(Number(moi.objectif_km)).replace(".", ",") : "";
+  $("pf-obj-seances").value = moi.objectif_seances || "";
+  $("pf-records").replaceChildren(...(Array.isArray(moi.records) ? moi.records : []).map((r) => ligneRecord(r)));
   majCompteur();
   afficherMessage("erreur-pf", "");
-  $("profil-vue").hidden = true;
-  $("profil-stats").hidden = true;
-  $("profil-courbe").hidden = true;
+  ["profil-vue", "profil-stats", "profil-courbe", "profil-objectifs", "profil-records"].forEach((id) => ($(id).hidden = true));
   $("profil-form").hidden = false;
+  window.scrollTo(0, 0);
 });
 $("pf-description").addEventListener("input", majCompteur);
 
@@ -2646,6 +2831,14 @@ $("profil-form").addEventListener("submit", async (event) => {
   };
   if (!champs.prenom) return afficherMessage("erreur-pf", "Indique ton prénom.");
   try {
+    // Objectifs : vides = pas d'objectif
+    const km = $("pf-obj-km").value.trim(), nb = $("pf-obj-seances").value.trim();
+    champs.objectif_km = km ? lireNombre(km) : null;
+    champs.objectif_seances = nb ? Math.round(lireNombre(nb) || 0) : null;
+    if (km && !(champs.objectif_km > 0 && champs.objectif_km <= 500)) throw erreurLisible("L'objectif de kilomètres doit être un nombre entre 1 et 500.");
+    if (nb && !(champs.objectif_seances >= 1 && champs.objectif_seances <= 21)) throw erreurLisible("L'objectif de séances doit être un nombre entre 1 et 21.");
+    // Records : on garde les lignes remplies
+    champs.records = [...$("pf-records").children].map((l) => l.lire()).filter(Boolean);
     await pendant($("bouton-pf"), "Enregistrement…", async () => {
       if (photoEnAttente) champs.photo_url = await donnees.envoyerPhoto(moi.id, photoEnAttente);
       await donnees.modifierProfil(moi.id, champs);
