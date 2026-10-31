@@ -424,13 +424,16 @@ button.cocher:hover .case { background: var(--ok); }
 
 /* BPM de chaque répétition */
 .reps-bloc { display: grid; gap: 8px; }
-.reps { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); gap: 6px 10px; align-items: center; }
+.reps { display: grid; grid-template-columns: auto repeat(4, minmax(0, 1fr)); gap: 6px 6px; align-items: center; }
+.reps .label { font-size: 11px; text-align: center; }
+.reps input { padding: 8px 2px; }
 .reps .rep-nom { font-weight: 600; font-size: 15px; white-space: nowrap; }
 .reps input { text-align: center; }
 .effort { display: grid; gap: 8px; }
-.reps-table { border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; min-width: 240px; }
+.reps-table { border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; min-width: 200px; }
 .reps-table th, .reps-table td { padding: 4px 10px; border-bottom: 1px solid var(--line); text-align: center; }
 .reps-table th:first-child, .reps-table td:first-child { text-align: left; padding-left: 0; }
+.reps-table th:last-child, .reps-table td:last-child { text-align: center; }
 .reps-table th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .chip.coeur { border-color: color-mix(in srgb, var(--erreur) 45%, var(--line)); }
 
@@ -510,6 +513,12 @@ details.anciennes .versions { gap: 10px; }
 .mentions-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
 .mentions-suggestions .suggestion { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; border-radius: 999px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); font-size: 15px; font-weight: 600; }
 .mentions-suggestions .suggestion:hover, .mentions-suggestions .suggestion:focus-visible { border-color: var(--track); }
+
+/* Trier le fil */
+.filtre-fil { display: grid; gap: 8px; justify-items: start; }
+.filtre-fil > .card { justify-self: stretch; display: grid; gap: 10px; }
+.filtre-fil > .card .label { margin: 0; }
+#filtre-fil-bouton.actif { border-color: var(--track); color: var(--track); background: color-mix(in srgb, var(--track) 10%, var(--surface)); }
 
 /* Prénoms cliquables */
 button.personne { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-align: left; border-radius: 4px; }
@@ -720,6 +729,16 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
       </form>
 
       <div class="propositions" id="propositions" hidden></div>
+      <div class="filtre-fil">
+        <button type="button" class="ghost compact" id="filtre-fil-bouton" aria-expanded="false" aria-controls="filtre-fil-choix">
+          Trier : <span id="filtre-fil-texte">Tout le monde</span>
+        </button>
+        <div class="card" id="filtre-fil-choix" hidden>
+          <p class="label">Voir les séances de…</p>
+          <div id="filtre-fil-personnes"></div>
+          <div class="choix-rapides"><button type="button" class="lien petit" id="filtre-fil-tous">Tout le monde</button></div>
+        </div>
+      </div>
       <div class="fil" id="fil-liste"></div>
       <button type="button" class="ghost" id="fil-plus" style="justify-self:center" hidden>Voir les séances plus anciennes</button>
     </div>
@@ -1077,9 +1096,18 @@ const donnees = {
 
   // Séances
   // Le fil ne montre que la séance « principale » d'un groupe (celle de la personne qui a publié)
-  async fil(de, a) {
-    const posts = verifier(await sb.from("seances").select(CHAMPS_FIL + ", groupe_id")
-      .eq("fait", true).eq("principal", true).order("fait_le", { ascending: false }).range(de, a));
+  // personnes : n'afficher que leurs séances (y compris celles où elles étaient « avec » quelqu'un)
+  async fil(de, a, personnes = []) {
+    let requete = sb.from("seances").select(CHAMPS_FIL + ", groupe_id").eq("fait", true).eq("principal", true);
+    if (personnes.length) {
+      const g = verifier(await sb.from("seances").select("groupe_id")
+        .in("athlete_id", personnes).eq("principal", false).not("groupe_id", "is", null));
+      const groupesAvec = [...new Set(g.map((x) => x.groupe_id))];
+      requete = groupesAvec.length
+        ? requete.or("athlete_id.in.(" + personnes.join(",") + "),groupe_id.in.(" + groupesAvec.join(",") + ")")
+        : requete.in("athlete_id", personnes);
+    }
+    const posts = verifier(await requete.order("fait_le", { ascending: false }).range(de, a));
     const groupes = posts.filter((p) => p.groupe_id).map((p) => p.groupe_id);
     if (groupes.length) {
       const autres = verifier(await sb.from("seances")
@@ -1403,13 +1431,26 @@ const RETOUR_AU_CALME = "Retour au calme : 10 min de footing + étirements";
 
 // Chaque modèle : ses champs (les durées, marquées « temps », sont en secondes),
 // puis comment fabriquer le titre et le contenu.
-// remplitDuree : la durée du modèle remplit la durée de la séance ; nbReps : nombre de répétitions (BPM par rép.)
+// remplitDuree : la durée du modèle remplit la durée de la séance (dureeTotale si elle se calcule) ;
+// nbReps : nombre de répétitions (un tableau durée / allure / BPM par répétition)
 const MODELES = {
   footing: {
     nom: "Footing", remplitDuree: true,
     champs: [{ id: "duree", label: "Durée", temps: true, defaut: 45 * 60 }],
     titre: (v) => "Footing " + enDuree(v.duree),
     corps: (v) => enDuree(v.duree) + " en endurance fondamentale (aisance respiratoire, tu peux parler)",
+  },
+  footing_fractionne: {
+    nom: "Footing fractionné", remplitDuree: true,
+    nbReps: (v) => v.reps,
+    dureeTotale: (v) => v.reps * v.duree + Math.max(0, v.reps - 1) * v.recup,
+    champs: [
+      { id: "reps", label: "Nombre de blocs", defaut: 3 },
+      { id: "duree", label: "Durée de chaque bloc", temps: true, defaut: 10 * 60 },
+      { id: "recup", label: "Récup entre les blocs", temps: true, defaut: 60 },
+    ],
+    titre: (v) => "Footing fractionné " + v.reps + " × " + enDuree(v.duree),
+    corps: (v) => v.reps + " × " + enDuree(v.duree) + " en endurance fondamentale, " + enDuree(v.recup) + " de récup en marchant entre les blocs",
   },
   sortie_longue: {
     nom: "Sortie longue", remplitDuree: true,
@@ -1427,6 +1468,7 @@ const MODELES = {
       { id: "recup", label: "Récup entre répétitions", temps: true, defaut: 60 },
       { id: "recupSerie", label: "Récup entre séries", temps: true, defaut: 3 * 60 },
     ],
+    nbReps: (v) => v.series * v.reps,
     titre: (v) => "Fractionné " + blocSeries(v, v.distance + " m"),
     corps: (v) => blocSeries(v, v.distance + " m") + ", r = " + enDuree(v.recup) + (v.series > 1 ? ", R = " + enDuree(v.recupSerie) : ""),
   },
@@ -1447,6 +1489,7 @@ const MODELES = {
   cotes: {
     nom: "Côtes",
     echauffement: ECHAUFFEMENT,
+    nbReps: (v) => v.reps,
     champs: [
       { id: "reps", label: "Nombre de côtes", defaut: 8 },
       { id: "duree", label: "Durée de chaque côte", temps: true, defaut: 30 },
@@ -1458,6 +1501,7 @@ const MODELES = {
   vitesse: {
     nom: "Vitesse",
     echauffement: ECHAUFFEMENT_VITESSE,
+    nbReps: (v) => v.reps,
     champs: [
       { id: "reps", label: "Répétitions", defaut: 6 },
       { id: "distance", label: "Distance", unite: "m", defaut: 60 },
@@ -1479,11 +1523,15 @@ function blocSeries(v, effort) {
   const base = v.reps + " × " + effort;
   return v.series > 1 ? v.series + " × (" + base + ")" : base;
 }
-// Nombre de répétitions d'une séance enregistrée (0 si ce n'est pas un seuil)
+// Nombre de répétitions d'une séance enregistrée (0 pour un footing, un renfo…)
 function nbRepsDe(s) {
   const m = MODELES[s.type];
   return m && m.nbReps && s.parametres ? m.nbReps(s.parametres) : 0;
 }
+// Ce qui est prévu pour chaque répétition : sa distance (m) et/ou sa durée (s)
+function prevuRep(v) { return { distance: Number(v && v.distance) || null, duree: Number(v && v.duree) || null }; }
+// Durée de séance proposée par un modèle
+function dureeModele(m, v) { return m && m.remplitDuree && v ? (m.dureeTotale ? m.dureeTotale(v) : v.duree) : null; }
 
 /* Éditeur « type de séance + champs préremplis », pour le coach et pour les athlètes.
    surChangement(type, valeurs) est appelé à chaque modification. */
@@ -1627,11 +1675,21 @@ function texteBpm(moy, max) {
 }
 // BPM de chaque répétition, en petit tableau
 function tableauReps(reps) {
-  if (!Array.isArray(reps) || !reps.some((r) => r && (r.moy || r.max))) return null;
+  if (!Array.isArray(reps)) return null;
+  const colonnes = [
+    { cle: "duree", nom: "Durée", texte: (r) => formatChrono(r.duree) },
+    { cle: "allure", nom: "Allure", texte: (r) => formatAllure(r.allure) },
+    { cle: "moy", nom: "BPM moy.", texte: (r) => String(r.moy) },
+    { cle: "max", nom: "BPM max", texte: (r) => String(r.max) },
+  ].filter((c) => reps.some((r) => r && r[c.cle]));
+  if (!colonnes.length) return null;
+  let dernier = reps.length - 1; // on n'affiche pas les dernières répétitions laissées vides
+  while (dernier > 0 && !reps[dernier]) dernier--;
+  reps = reps.slice(0, dernier + 1);
   return el("div", { class: "table-wrap" }, el("table", { class: "reps-table" }, [
-    el("thead", {}, el("tr", {}, [el("th", {}, "Répétition"), el("th", {}, "BPM moy."), el("th", {}, "BPM max")])),
+    el("thead", {}, el("tr", {}, [el("th", {}, "Rép."), ...colonnes.map((c) => el("th", {}, c.nom))])),
     el("tbody", {}, reps.map((r, i) => el("tr", {}, [
-      el("td", {}, "Rép. " + (i + 1)), el("td", {}, r && r.moy ? String(r.moy) : "–"), el("td", {}, r && r.max ? String(r.max) : "–"),
+      el("td", {}, String(i + 1)), ...colonnes.map((c) => el("td", {}, r && r[c.cle] ? c.texte(r) : "–")),
     ]))),
   ]));
 }
@@ -1731,30 +1789,97 @@ function champsForme(prefixe, s = {}) {
   };
 }
 
-// BPM moyen et max de chaque répétition (séances de seuil)
-function champsReps(prefixe, nb, existants = []) {
-  let gardes = (existants || []).map((r) => ({ ...r }));
+// Chrono d'une répétition : « 1:18 », « 8:00 », « 7,8 s »
+function formatChrono(sec) {
+  if (sec == null) return "";
+  if (sec < 60) return (Math.round(sec * 10) / 10).toLocaleString("fr-FR") + " s";
+  const t = Math.round(sec), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), r = String(t % 60).padStart(2, "0");
+  return h ? h + ":" + String(m).padStart(2, "0") + ":" + r : m + ":" + r;
+}
+function formatAllure(secKm) {
+  if (!secKm) return "";
+  const t = Math.round(secKm);
+  return Math.floor(t / 60) + ":" + String(t % 60).padStart(2, "0");
+}
+// « 1:18 », « 1'18 », « 8 » (minutes si la répétition prévue dure 2 min ou plus, sinon secondes), « 7,8 » (secondes)
+function lireChrono(texte, prevuSec, nom) {
+  const t = texte.trim().replace(/['’]/g, ":").replace(/\s*(min|mn|s|sec)\s*$/i, "");
+  if (!t) return null;
+  let sec;
+  const parts = t.split(":");
+  if (parts.length > 1) {
+    if (parts.length > 3 || parts.some((x) => !/^\d+([.,]\d+)?$/.test(x))) sec = NaN;
+    else sec = parts.reduce((acc, x) => acc * 60 + Number(x.replace(",", ".")), 0);
+  } else if (/^\d+$/.test(t)) {
+    sec = Number(t) * (prevuSec && prevuSec >= 120 ? 60 : 1);
+  } else if (/^\d+[.,]\d+$/.test(t)) {
+    sec = Number(t.replace(",", "."));
+  } else sec = NaN;
+  if (!Number.isFinite(sec) || sec <= 0 || sec > 6 * 3600) throw erreurLisible(nom + " : écris la durée comme « 1:18 » (1 min 18 s) ou « 8:00 » (8 min).");
+  return Math.round(sec * 10) / 10;
+}
+// « 4:05 », « 4'05 », « 4.05 » ou « 4 » (minutes par km)
+function lireAllure(texte, nom) {
+  const t = texte.trim().replace(/['’.,]/g, ":").replace(/\s*\/?\s*km\s*$/i, "");
+  if (!t) return null;
+  const m = t.match(/^(\d{1,2})(?::(\d{1,2}))?$/);
+  const sec = m ? Number(m[1]) * 60 + Number((m[2] || "0").padEnd(2, "0")) : NaN;
+  if (!m || (m[2] && Number(m[2].padEnd(2, "0")) > 59) || sec < 90 || sec > 20 * 60) throw erreurLisible(nom + " : écris l'allure en minutes par km, comme « 4:05 ».");
+  return sec;
+}
+
+// Tableau de chaque répétition : durée, allure, BPM moyen et max (tout est facultatif)
+// prevu : { distance (m), duree (s) } d'une répétition, pour l'exemple et le calcul de l'allure
+function champsReps(prefixe, nb, existants = [], prevu = {}) {
+  let gardes = (existants || []).map((r) => (r ? {
+    duree: r.duree ? formatChrono(r.duree).replace(" s", "").replace(".", ",") : "",
+    allure: r.allure && !r.allureCalculee ? formatAllure(r.allure) : "",
+    moy: r.moy ? String(r.moy) : "", max: r.max ? String(r.max) : "",
+  } : null));
   const grille = el("div", { class: "reps" });
+  const aide = el("p", { class: "aide" });
   const bloc = el("fieldset", { class: "reps-bloc" }, [
-    el("legend", { class: "label" }, "BPM de chaque répétition (facultatif)"), grille,
+    el("legend", { class: "label" }, "Chaque répétition (facultatif)"), grille, aide,
   ]);
   let lignes = [];
   function garder() {
-    lignes.forEach((l, i) => { gardes[i] = { moy: l.moy.value.trim(), max: l.max.value.trim() }; });
+    lignes.forEach((l, i) => { gardes[i] = { duree: l.duree.value.trim(), allure: l.allure.value.trim(), moy: l.moy.value.trim(), max: l.max.value.trim() }; });
   }
-  function maj(n) {
+  function case_(id, nom, valeur, mode = "numeric") {
+    const i = el("input", { id, type: "text", inputmode: mode, autocomplete: "off", placeholder: "–", "aria-label": nom });
+    if (valeur) i.value = valeur;
+    return i;
+  }
+  // Allure calculée toute seule quand la distance de la répétition est connue
+  function allureAuto(l) {
+    if (!prevu.distance) return;
+    let sec = null;
+    try { sec = lireChrono(l.duree.value, prevu.duree, ""); } catch (e) { sec = null; }
+    l.allure.placeholder = sec ? formatAllure(sec / (prevu.distance / 1000)) : "–";
+  }
+  function maj(n, nouveauPrevu) {
     garder();
+    if (nouveauPrevu) prevu = nouveauPrevu;
     lignes = [];
-    grille.replaceChildren(el("span", { class: "label" }, ""), el("span", { class: "label" }, "Moyen"), el("span", { class: "label" }, "Max"));
+    grille.replaceChildren(...["", "Durée", "Allure", "BPM moy", "BPM max"].map((t) => el("span", { class: "label" }, t)));
     for (let i = 0; i < n; i++) {
-      const moy = caseBpm(prefixe + "-moy-" + i, "BPM moyen", gardes[i] && gardes[i].moy);
-      const max = caseBpm(prefixe + "-max-" + i, "BPM max", gardes[i] && gardes[i].max);
-      moy.placeholder = max.placeholder = "–"; // pas d'exemple chiffré : il ressemblerait à une vraie valeur
-      moy.setAttribute("aria-label", "Répétition " + (i + 1) + " : BPM moyen");
-      max.setAttribute("aria-label", "Répétition " + (i + 1) + " : BPM max");
-      grille.append(el("span", { class: "rep-nom" }, "Rép. " + (i + 1)), moy, max);
-      lignes.push({ moy, max });
+      const g = gardes[i] || {};
+      const nom = "Répétition " + (i + 1);
+      const l = {
+        duree: case_(prefixe + "-duree-" + i, nom + " : durée", g.duree, "decimal"),
+        allure: case_(prefixe + "-allure-" + i, nom + " : allure (min par km)", g.allure, "decimal"),
+        moy: case_(prefixe + "-moy-" + i, nom + " : BPM moyen", g.moy),
+        max: case_(prefixe + "-max-" + i, nom + " : BPM max", g.max),
+      };
+      if (prevu.duree && !prevu.distance) l.duree.placeholder = formatChrono(prevu.duree);
+      l.duree.addEventListener("input", () => allureAuto(l));
+      allureAuto(l);
+      grille.append(el("span", { class: "rep-nom" }, "Rép. " + (i + 1)), l.duree, l.allure, l.moy, l.max);
+      lignes.push(l);
     }
+    aide.textContent = prevu.distance
+      ? "Durée comme « 1:18 » ; l'allure se calcule toute seule avec les " + prevu.distance + " m. Allure en min/km."
+      : "Durée comme « 8:00 » (ou « 8 » pour 8 min) ; allure en min/km, comme « 4:05 ».";
     bloc.hidden = n === 0;
   }
   maj(nb);
@@ -1762,8 +1887,17 @@ function champsReps(prefixe, nb, existants = []) {
     bloc, maj,
     lire() {
       const res = lignes.map((l, i) => {
-        const moy = lireBpm(l.moy, "Rép. " + (i + 1) + ", BPM moyen"), max = lireBpm(l.max, "Rép. " + (i + 1) + ", BPM max");
-        return moy || max ? { moy, max } : null;
+        const nom = "Rép. " + (i + 1);
+        const r = {};
+        const duree = lireChrono(l.duree.value, prevu.duree, nom);
+        let allure = lireAllure(l.allure.value, nom);
+        if (!allure && duree && prevu.distance) { allure = Math.round(duree / (prevu.distance / 1000)); r.allureCalculee = true; }
+        const moy = lireBpm(l.moy, nom + ", BPM moyen"), max = lireBpm(l.max, nom + ", BPM max");
+        if (duree) r.duree = duree;
+        if (allure) r.allure = allure;
+        if (moy) r.moy = moy;
+        if (max) r.max = max;
+        return Object.keys(r).some((k) => k !== "allureCalculee") ? r : null;
       });
       return res.some(Boolean) ? res : null;
     },
@@ -1988,6 +2122,7 @@ function ouvrirProfil(profil) {
   moi = profil;
   ecrire("couloir-dernier", profil.id);
   majEntete();
+  preparerFiltreFil();
 
   const liste = ongletsDe(moi);
   $("nav-int").replaceChildren(...liste.map((o) => {
@@ -2072,6 +2207,12 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "2.2", nom: "Bloc par bloc", date: "31 octobre 2026", nouveautes: [
+    "Le fil peut se trier : on choisit les personnes dont on veut voir les séances.",
+    "Nouveau type de séance : le footing fractionné (par exemple 3 × 10 min avec 1 min de récup).",
+    "Le tableau des répétitions arrive pour toutes les séances à répétitions (fractionné, côtes, vitesse, footing fractionné).",
+    "Pour chaque répétition, on peut noter sa durée et son allure en plus des BPM ; sur une distance, l'allure se calcule toute seule.",
+  ] },
   { num: "2.1", nom: "@ toi", date: "31 octobre 2026", nouveautes: [
     "On peut mentionner quelqu'un dans un commentaire : tape @ puis choisis son prénom.",
     "La personne mentionnée reçoit une notification (on peut la couper dans son profil).",
@@ -2655,20 +2796,61 @@ function libelleJour(iso) {
 }
 let dernierJourFil = null;
 
-async function chargerFil(depuisLeDebut) {
+/* ---------- Trier le fil : ne voir que certaines personnes ---------- */
+let filtreFil = [];
+function cleFiltreFil() { return "couloir-filtre-fil-" + (moi ? moi.id : ""); }
+function preparerFiltreFil() {
+  let garde = [];
+  try { garde = JSON.parse(lire(cleFiltreFil()) || "[]"); } catch (e) { garde = []; }
+  filtreFil = Array.isArray(garde) ? garde.filter((id) => profilsConnus.some((p) => p.id === id)) : [];
+  $("filtre-fil-choix").hidden = true;
+  $("filtre-fil-bouton").setAttribute("aria-expanded", "false");
+  majTexteFiltre();
+}
+function majTexteFiltre() {
+  const noms = filtreFil.map((id) => (moi && id === moi.id ? "Moi" : (profilsConnus.find((p) => p.id === id) || {}).prenom)).filter(Boolean);
+  $("filtre-fil-texte").textContent = !noms.length ? "Tout le monde" : noms.length <= 2 ? noms.join(" et ") : noms.length + " personnes";
+  $("filtre-fil-bouton").classList.toggle("actif", noms.length > 0);
+}
+let attenteFiltre = null;
+function appliquerFiltre(ids) {
+  filtreFil = ids;
+  ecrire(cleFiltreFil(), JSON.stringify(ids));
+  majTexteFiltre();
+  clearTimeout(attenteFiltre);
+  attenteFiltre = setTimeout(() => chargerFil(true, false), 250);
+}
+$("filtre-fil-bouton").addEventListener("click", () => {
+  const zone = $("filtre-fil-choix");
+  zone.hidden = !zone.hidden;
+  $("filtre-fil-bouton").setAttribute("aria-expanded", String(!zone.hidden));
+  if (zone.hidden) return;
+  const personnes = [{ ...moi, estMoi: true }, ...profilsConnus.filter((p) => p.id !== moi.id)];
+  const choix = choixPersonnes("filtre-fil", personnes, { coches: filtreFil });
+  choix.bloc.addEventListener("change", () => appliquerFiltre(choix.valeurs()));
+  $("filtre-fil-personnes").replaceChildren(choix.bloc);
+});
+$("filtre-fil-tous").addEventListener("click", () => {
+  $("filtre-fil-personnes").querySelectorAll("input").forEach((i) => { i.checked = false; });
+  appliquerFiltre([]);
+});
+
+async function chargerFil(depuisLeDebut, avecPropositions = true) {
   const liste = $("fil-liste");
   if (depuisLeDebut) {
-    afficherPropositions();
+    if (avecPropositions) afficherPropositions();
     dernierJourFil = null;
     pageFil = 0;
     liste.replaceChildren(el("p", { class: "muted" }, "Chargement du fil…"));
   }
   try {
     const de = pageFil * PAR_PAGE;
-    const posts = await donnees.fil(de, de + PAR_PAGE - 1);
+    const posts = await donnees.fil(de, de + PAR_PAGE - 1, filtreFil);
     if (depuisLeDebut) liste.replaceChildren();
     if (depuisLeDebut && posts.length === 0) {
-      liste.append(el("p", { class: "vide" }, "Rien pour l'instant. Dès qu'une séance sera cochée comme faite ou publiée, elle apparaîtra ici."));
+      liste.append(el("p", { class: "vide" }, filtreFil.length
+        ? "Aucune séance de " + (filtreFil.length > 1 ? "ces personnes" : "cette personne") + " pour l'instant."
+        : "Rien pour l'instant. Dès qu'une séance sera cochée comme faite ou publiée, elle apparaîtra ici."));
     }
     posts.forEach((s) => {
       // Une petite ligne avec la date dès qu'on change de jour
@@ -2707,7 +2889,7 @@ function ouvrirPublier(existante = null) {
   $("pub-date").value = existante ? (existante.date || "") : aujourdhui();
   $("pub-commentaire").value = s.commentaire || "";
   effortPublier = champsEffort("pub", s);
-  repsPublier = champsReps("pub-rep", nbRepsDe(s), s.reps_bpm);
+  repsPublier = champsReps("pub-rep", nbRepsDe(s), s.reps_bpm, prevuRep(s.parametres));
   formePublier = champsForme("pub", s);
   $("pub-effort").replaceChildren(effortPublier.bloc);
   $("pub-reps").replaceChildren(repsPublier.bloc);
@@ -2719,8 +2901,8 @@ function ouvrirPublier(existante = null) {
     surChangement: (type, v) => {
       if (!pubEnModif) ecrire("couloir-type-pub", type);
       const m = MODELES[type];
-      effortPublier.proposerDuree(m.remplitDuree ? v.duree : null);
-      repsPublier.maj(m.nbReps ? m.nbReps(v) : 0);
+      effortPublier.proposerDuree(dureeModele(m, v));
+      repsPublier.maj(m.nbReps ? m.nbReps(v) : 0, prevuRep(v));
     },
   });
   if (existante) modelePublier.charger(existante);
@@ -2926,10 +3108,10 @@ function carteSemaine(s, surChangement = () => {}) {
     const rpe = choixRessenti("rpe-" + s.id, s.ressenti);
     const effort = champsEffort("effort-" + s.id, s);
     // Séance prévue avec une durée (footing…) : on la propose
-    if (MODELES[s.type] && MODELES[s.type].remplitDuree && s.parametres) effort.proposerDuree(s.parametres.duree);
+    if (s.parametres && dureeModele(MODELES[s.type], s.parametres)) effort.proposerDuree(dureeModele(MODELES[s.type], s.parametres));
     const forme = champsForme("forme-" + s.id, s);
     const nb = nbRepsDe(s);
-    const reps = nb ? champsReps("reps-" + s.id, nb, s.reps_bpm) : null;
+    const reps = nb ? champsReps("reps-" + s.id, nb, s.reps_bpm, prevuRep(s.parametres)) : null;
     const photo = champPhotos("seance-" + s.id, photosDe(s));
     const idCom = "com-" + s.id;
     const com = el("textarea", { id: idCom, placeholder: "Comment ça s'est passé ? Sensations, chronos, douleurs…" });
