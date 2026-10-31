@@ -362,10 +362,49 @@ button.cocher:hover .case { background: var(--ok); }
 .record-ligne .large { grid-column: 1 / 3; }
 .record-ligne .retirer-record { width: 40px; height: 44px; padding: 0; font-size: 20px; }
 
+/* Choix de plusieurs personnes */
+.choix-personnes { display: flex; flex-wrap: wrap; gap: 8px; position: relative; }
+.choix-personnes input { position: absolute; left: 0; top: 0; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+.choix-personnes label {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 4px 12px 4px 4px; border: 1px solid var(--line); border-radius: 99px;
+  font-size: 15px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--ink); background: var(--surface);
+}
+.choix-personnes input:checked + label { border-color: var(--track); background: color-mix(in srgb, var(--track) 14%, var(--surface)); }
+.choix-personnes input:checked + label::after { content: "✓"; color: var(--track); font-weight: 700; }
+.choix-personnes input:focus-visible + label { outline: 2px solid var(--track); outline-offset: 2px; }
+.choix-rapides { display: flex; gap: 16px; margin-top: 8px; }
+
+/* Calendrier */
+.calendrier { padding: 12px; gap: 8px; }
+.cal-grille { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-entete span { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .05em; }
+.jour {
+  aspect-ratio: 1 / 1; max-width: 100%; min-width: 0; padding: 4px 2px; border-radius: 8px;
+  display: grid; grid-template-rows: 1fr auto; justify-items: center; align-items: center;
+  background: transparent; border: 1px solid transparent; color: var(--ink); font-weight: 600; font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.jour:hover { border-color: var(--line); }
+.jour.hors-mois { color: var(--muted); opacity: .45; }
+.jour.aujourdhui { border-color: var(--track); }
+.jour.choisi { background: var(--track); color: var(--surface); border-color: var(--track); }
+.jour.choisi .point.prevu { border-color: var(--surface); }
+.jour.choisi .point.fait, .jour.choisi .point.manque { background: var(--surface); }
+.points { display: flex; gap: 3px; min-height: 8px; }
+.point { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.point.fait { background: var(--ok); }
+.point.prevu { border: 2px solid var(--track); }
+.point.manque { background: var(--erreur); opacity: .7; }
+.cal-legende { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); padding: 4px 4px 0; }
+.cal-legende span { display: inline-flex; align-items: center; gap: 6px; }
+.confirmation { margin: 0; font-weight: 600; }
+
 /* Prénoms cliquables */
 button.personne { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-align: left; border-radius: 4px; }
 button.personne:hover b, button.personne:focus-visible b { text-decoration: underline; text-underline-offset: 3px; }
 button.avatar-lien { display: inline-flex; flex: none; }
+button.nom-avec b { color: var(--ink); font-weight: 600; }
 button.nom-lien { min-width: 0; overflow-wrap: anywhere; }
 button.nom-lien:hover .nom { text-decoration: underline; text-underline-offset: 3px; }
 
@@ -547,6 +586,11 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
           <input id="pub-date" type="date">
         </div>
         <div id="pub-modele"></div>
+        <fieldset>
+          <legend class="label">Avec qui ? (facultatif)</legend>
+          <div id="pub-avec"></div>
+          <p class="aide">La séance comptera aussi dans leurs statistiques et leurs trophées. Elle n'apparaîtra qu'une fois dans le fil.</p>
+        </fieldset>
         <div class="saisie-effort">
           <div class="field">
             <label for="pub-distance">Distance (km)</label>
@@ -576,6 +620,35 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
 
     <!-- ONGLET MA SEMAINE (athlète) -->
     <div class="panneau" id="panneau-semaine" hidden>
+      <div class="bascule" role="group" aria-label="Affichage" id="vue-choix">
+        <button type="button" data-vue="semaine" aria-pressed="true">Semaine</button>
+        <button type="button" data-vue="mois" aria-pressed="false">Calendrier</button>
+      </div>
+
+      <!-- Vue calendrier (mois) -->
+      <div class="panneau" id="vue-mois" hidden>
+        <div class="semaine-nav">
+          <button type="button" class="ghost" id="mois-prec" aria-label="Mois précédent">←</button>
+          <h2 id="mois-titre">Mois</h2>
+          <button type="button" class="ghost" id="mois-suiv" aria-label="Mois suivant">→</button>
+        </div>
+        <div class="calendrier card">
+          <div class="cal-grille cal-entete" aria-hidden="true">
+            <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
+          </div>
+          <div class="cal-grille" id="cal-jours"></div>
+          <div class="cal-legende">
+            <span><i class="point fait"></i> Séance faite</span>
+            <span><i class="point prevu"></i> Prévue par le coach</span>
+            <span><i class="point manque"></i> Prévue, pas faite</span>
+          </div>
+        </div>
+        <h3 id="cal-titre-jour"></h3>
+        <div class="seances" id="cal-detail"></div>
+      </div>
+
+      <!-- Vue semaine -->
+      <div class="panneau" id="vue-semaine">
       <div class="semaine-nav">
         <button type="button" class="ghost" id="sem-prec" aria-label="Semaine précédente">←</button>
         <div>
@@ -590,6 +663,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
       </div>
       <div class="objectifs" id="sem-objectifs" hidden></div>
       <div class="seances" id="sem-liste"></div>
+      </div>
     </div>
 
     <!-- ONGLET PLANIFIER (coach) -->
@@ -601,15 +675,13 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
 
         <form id="form-seance" novalidate>
           <p class="bandeau-modif" id="info-modif" hidden></p>
-          <div class="row">
-            <div class="field">
-              <label for="choix-athlete">Athlète</label>
-              <select id="choix-athlete"></select>
-            </div>
-            <div class="field">
-              <label for="seance-date">Date</label>
-              <input id="seance-date" type="date">
-            </div>
+          <fieldset id="bloc-destinataires">
+            <legend class="label">Pour qui ? (une ou plusieurs personnes)</legend>
+            <div id="destinataires"></div>
+          </fieldset>
+          <div class="field" style="max-width:220px">
+            <label for="seance-date">Date</label>
+            <input id="seance-date" type="date">
           </div>
 
           <fieldset>
@@ -659,6 +731,17 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
         <h3 id="coach-titre-liste">Séances envoyées</h3>
         <button type="button" class="lien" id="voir-profil-athlete">Voir son profil</button>
       </div>
+      <div class="row" id="bloc-choix-athlete">
+        <div class="field">
+          <label for="choix-athlete">Personne</label>
+          <select id="choix-athlete"></select>
+        </div>
+        <div class="field">
+          <label for="filtre-jour">Jour</label>
+          <input id="filtre-jour" type="date">
+        </div>
+      </div>
+      <button type="button" class="lien petit" id="filtre-tous-jours" style="justify-self:start" hidden>Voir tous les jours</button>
       <div class="seances" id="coach-seances"></div>
     </div>
 
@@ -844,7 +927,19 @@ const donnees = {
     verifier(await sb.from("profils").update(champs).eq("id", id));
   },
   async athletes() {
-    return verifier(await sb.from("profils").select("id, prenom, nom, discipline").eq("role", "Athlète").order("prenom"));
+    return verifier(await sb.from("profils").select("id, prenom, nom, discipline, photo_url, couleur").eq("role", "Athlète").order("prenom"));
+  },
+  // Les séances données par le coach, filtrées par personne et/ou par jour
+  async seancesDonnees(coachId, { athleteId = null, jour = null } = {}) {
+    let q = sb.from("seances").select(CHAMPS_SEANCE + ", athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url, couleur)")
+      .eq("coach_id", coachId);
+    if (athleteId) q = q.eq("athlete_id", athleteId);
+    if (jour) q = q.eq("date", jour);
+    return verifier(await q.order("date", { ascending: false, nullsFirst: false }).order("cree_le", { ascending: false }).limit(300));
+  },
+  async toutesMesSeances(id) {
+    return verifier(await sb.from("seances").select(CHAMPS_SEANCE + ", groupe_id, principal")
+      .eq("athlete_id", id).order("date", { ascending: true }).limit(2000));
   },
   async seancesFaitesDe(id) {
     return verifier(await sb.from("seances").select("id, date, fait_le, type, ressenti, distance_km, duree_min")
@@ -868,10 +963,20 @@ const donnees = {
   },
 
   // Séances
+  // Le fil ne montre que la séance « principale » d'un groupe (celle de la personne qui a publié)
   async fil(de, a) {
-    return verifier(await sb.from("seances").select(CHAMPS_FIL)
-      .eq("fait", true).order("fait_le", { ascending: false }).range(de, a));
+    const posts = verifier(await sb.from("seances").select(CHAMPS_FIL + ", groupe_id")
+      .eq("fait", true).eq("principal", true).order("fait_le", { ascending: false }).range(de, a));
+    const groupes = posts.filter((p) => p.groupe_id).map((p) => p.groupe_id);
+    if (groupes.length) {
+      const autres = verifier(await sb.from("seances")
+        .select("groupe_id, athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url, couleur)")
+        .in("groupe_id", groupes).eq("principal", false));
+      posts.forEach((p) => { p.avec = autres.filter((x) => x.groupe_id === p.groupe_id).map((x) => x.athlete).filter(Boolean); });
+    }
+    return posts;
   },
+  async supprimerGroupe(groupeId) { verifier(await sb.from("seances").delete().eq("groupe_id", groupeId)); },
   async semaine(athleteId, debut, fin) {
     return verifier(await sb.from("seances").select(CHAMPS_SEANCE)
       .eq("athlete_id", athleteId).not("coach_id", "is", null)
@@ -898,7 +1003,7 @@ const donnees = {
   // Nouveautés depuis la dernière visite
   async nbNouveauxPosts(moiId, depuis) {
     const { count, error } = await sb.from("seances").select("id", { count: "exact", head: true })
-      .eq("fait", true).neq("athlete_id", moiId).gt("fait_le", depuis);
+      .eq("fait", true).eq("principal", true).neq("athlete_id", moiId).gt("fait_le", depuis);
     if (error) throw error;
     return count || 0;
   },
@@ -947,6 +1052,14 @@ function el(balise, attributs = {}, enfants = []) {
   (Array.isArray(enfants) ? enfants : [enfants]).forEach((c) => c != null && e.append(c));
   return e;
 }
+// Identifiant unique (format UUID) pour relier les séances faites ensemble
+function nouvelUuid() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  const o = crypto.getRandomValues(new Uint8Array(16));
+  o[6] = (o[6] & 0x0f) | 0x40; o[8] = (o[8] & 0x3f) | 0x80;
+  const h = [...o].map((x) => x.toString(16).padStart(2, "0")).join("");
+  return h.slice(0, 8) + "-" + h.slice(8, 12) + "-" + h.slice(12, 16) + "-" + h.slice(16, 20) + "-" + h.slice(20);
+}
 function isoLocal(d) {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
@@ -970,6 +1083,8 @@ function ilYa(iso) {
   return "le " + new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
 }
 // Partout dans l'appli, on n'affiche que le prénom (ni nom de famille, ni rôle)
+// « de Tom », mais « d'Inès » devant une voyelle ou un h
+function de(prenom) { return (/^[aeiouyhàâäéèêëîïôöùûüœ]/i.test(prenom) ? "d'" : "de ") + prenom; }
 function nomComplet(p) { return p && p.prenom ? p.prenom : "Coach"; }
 
 function remplirDisciplines(select) {
@@ -1542,7 +1657,7 @@ function aller(o, personne = null) {
   if (o === "fil" || o === "semaine") marquerVu(o);
   majPastilles();
   if (o === "fil") chargerFil(true);
-  if (o === "semaine") chargerSemaine();
+  if (o === "semaine") afficherVue();
   if (o === "planifier") afficherPlanifier();
   if (o === "trophees") afficherTrophees();
   if (o === "profil") afficherProfil();
@@ -1667,9 +1782,32 @@ $("profil-retour").addEventListener("click", () => {
   window.scrollTo(0, r.defilement);
 });
 
+// Pastilles à cocher pour choisir une ou plusieurs personnes
+function choixPersonnes(prefixe, personnes, { coches = [], raccourcis = false } = {}) {
+  const zone = el("div", { class: "choix-personnes" }, personnes.flatMap((p) => {
+    const id = prefixe + "-" + p.id;
+    const input = el("input", { type: "checkbox", id, value: p.id });
+    if (coches.includes(p.id)) input.checked = true;
+    return [input, el("label", { for: id }, [avatarEl(p, "mini"), p.estMoi ? "Moi-même" : nomComplet(p)])];
+  }));
+  const bloc = el("div", {}, zone);
+  if (raccourcis && personnes.length > 1) {
+    const tous = el("button", { type: "button", class: "lien petit" }, "Tout le groupe");
+    const aucun = el("button", { type: "button", class: "lien petit" }, "Personne");
+    const cocher = (v, filtre = () => true) => zone.querySelectorAll("input").forEach((i) => { if (filtre(i)) i.checked = v; });
+    tous.addEventListener("click", () => cocher(true, (i) => !personnes.find((p) => p.id === i.value)?.estMoi));
+    aucun.addEventListener("click", () => cocher(false));
+    bloc.append(el("div", { class: "choix-rapides" }, [tous, aucun]));
+  }
+  return {
+    bloc,
+    valeurs: () => [...zone.querySelectorAll("input:checked")].map((i) => i.value),
+  };
+}
+
 // Un prénom (et son avatar) cliquable qui ouvre le profil de la personne
 function lienPersonne(p, enfants, classe = "personne") {
-  const b = el("button", { type: "button", class: classe, title: "Voir le profil de " + nomComplet(p) }, enfants);
+  const b = el("button", { type: "button", class: classe, title: "Voir le profil " + de(nomComplet(p)) }, enfants);
   b.addEventListener("click", () => voirProfil(p));
   return b;
 }
@@ -1681,13 +1819,19 @@ function carteFil(s) {
   const estNouveau = vuAvant.fil && s.fait_le > vuAvant.fil && moi && auteur.id !== moi.id;
   const quoi = !s.coach_id ? "a publié une séance"
     : s.coach_id === auteur.id ? "a fait sa séance prévue"
-    : "a fait la séance de " + nomComplet(s.coach);
+    : "a fait la séance " + de(nomComplet(s.coach));
+  // « avec Tom et Inès » : chaque prénom est cliquable
+  const avec = [];
+  (s.avec || []).forEach((p, i, tab) => {
+    avec.push(i === 0 ? " avec " : i === tab.length - 1 ? " et " : ", ");
+    avec.push(lienPersonne(p, el("b", {}, nomComplet(p)), "personne nom-avec"));
+  });
   const carte = el("article", { class: "seance post" }, [
     el("div", { class: "post-tete" }, [
       lienPersonne(auteur, avatarEl(auteur, "petit"), "personne avatar-lien"),
       el("div", { class: "post-qui" }, [
         el("div", { class: "post-nom" }, [lienPersonne(auteur, el("b", {}, nomComplet(auteur))), estNouveau ? etiquetteNouveau() : null]),
-        el("div", { class: "muted petit" }, quoi + " · " + ilYa(s.fait_le)),
+        el("div", { class: "muted petit" }, [quoi, ...avec, " · " + ilYa(s.fait_le)]),
       ]),
     ]),
     s.date ? enTeteSeance(s) : null,
@@ -1702,7 +1846,11 @@ function carteFil(s) {
   if (!s.coach_id && moi && auteur.id === moi.id) {
     const b = el("button", { type: "button", class: "lien petit", style: "justify-self:start" }, "Supprimer ma publication");
     b.addEventListener("click", async () => {
-      try { await pendant(b, "Suppression…", () => donnees.supprimerSeance(s.id)); carte.remove(); }
+      try {
+        // Une séance faite à plusieurs disparaît pour tout le monde
+        await pendant(b, "Suppression…", () => (s.groupe_id ? donnees.supprimerGroupe(s.groupe_id) : donnees.supprimerSeance(s.id)));
+        carte.remove();
+      }
       catch (e) { b.replaceWith(el("p", { class: "error" }, messageErreur(e))); }
     });
     carte.append(b);
@@ -1858,6 +2006,7 @@ $("fil-plus").addEventListener("click", () => pendant($("fil-plus"), "Chargement
 let ressentiPublier = null;
 let photoPublier = null;
 let modelePublier = null;
+let choixAvec = null;
 let dureeTapee = false; // la durée a-t-elle été tapée à la main ?
 $("pub-duree").addEventListener("input", () => { dureeTapee = $("pub-duree").value.trim() !== ""; });
 $("ouvrir-publier").addEventListener("click", () => {
@@ -1874,6 +2023,9 @@ $("ouvrir-publier").addEventListener("click", () => {
     },
   });
   $("pub-modele").replaceChildren(modelePublier.bloc);
+  const autres = profilsConnus.filter((p) => p.id !== moi.id);
+  choixAvec = choixPersonnes("avec", autres);
+  $("pub-avec").replaceChildren(autres.length ? choixAvec.bloc : el("p", { class: "muted petit" }, "Personne d'autre n'est encore inscrit."));
   ressentiPublier = choixRessenti("pub-rpe", null);
   photoPublier = champPhoto("pub-image", null);
   $("pub-photo").replaceChildren(photoPublier.bloc);
@@ -1892,14 +2044,26 @@ $("form-publier").addEventListener("submit", async (event) => {
   if (!titre && !contenu) return afficherMessage("erreur-publier", "Donne au moins un titre ou un contenu à ta séance.");
   try {
     const effort = lireEffort($("pub-distance"), $("pub-duree"));
-    await pendant($("bouton-publier"), "Publication…", async () => donnees.envoyerSeance({
-      athlete_id: moi.id, coach_id: null, type,
-      date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null,
-      fait: true, fait_le: new Date().toISOString(),
-      ressenti: ressentiPublier.valeur(), commentaire: $("pub-commentaire").value.trim() || null,
-      photo_url: await photoPublier.url(moi.id),
-      ...effort,
-    }));
+    const avec = choixAvec ? choixAvec.valeurs() : [];
+    await pendant($("bouton-publier"), "Publication…", async () => {
+      const commun = {
+        coach_id: null, type, date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null,
+        fait: true, fait_le: new Date().toISOString(), ...effort,
+      };
+      // Ma séance (avec mon ressenti, mon commentaire et la photo)…
+      const principale = {
+        ...commun, athlete_id: moi.id,
+        ressenti: ressentiPublier.valeur(), commentaire: $("pub-commentaire").value.trim() || null,
+        photo_url: await photoPublier.url(moi.id),
+      };
+      if (!avec.length) return donnees.envoyerSeance(principale);
+      // … et la même séance pour chaque personne avec qui j'ai couru, reliées par un même groupe
+      const groupe_id = nouvelUuid();
+      return donnees.envoyerSeance([
+        { ...principale, groupe_id, principal: true },
+        ...avec.map((id) => ({ ...commun, athlete_id: id, groupe_id, principal: false })),
+      ]);
+    });
     fermerPublier();
     chargerFil(true);
   } catch (e) {
@@ -1962,7 +2126,8 @@ function majProgression() {
   $("sem-compte").textContent = faites + " séance" + (faites > 1 ? "s" : "") + " faite" + (faites > 1 ? "s" : "") + " sur " + total;
 }
 
-function carteSemaine(s) {
+// surChangement() est appelé quand la séance est cochée, modifiée ou retirée (utile au calendrier)
+function carteSemaine(s, surChangement = () => {}) {
   const carte = el("article", { class: "seance" });
   const zone = el("div", { class: "ressenti-zone" });
   const estNouvelle = vuAvant.semaine && s.cree_le && s.cree_le > vuAvant.semaine && s.coach_id !== moi.id;
@@ -1984,7 +2149,9 @@ function carteSemaine(s) {
     if (!s.fait) {
       const cocher = el("button", { type: "button", class: "cocher" }, [el("span", { class: "case", "aria-hidden": "true" }), "J'ai fait cette séance"]);
       cocher.addEventListener("click", ouvrirFormulaire);
-      zone.append(cocher);
+      const retirer = el("button", { type: "button", class: "lien petit" }, "Retirer cette séance");
+      retirer.addEventListener("click", demanderRetrait);
+      zone.append(el("div", { class: "actions" }, [cocher, retirer]));
       return;
     }
     zone.append(etatEffort(s, [el("span", { class: "pill faite" }, "✓ Faite")]));
@@ -1995,10 +2162,34 @@ function carteSemaine(s) {
     const decocher = el("button", { type: "button", class: "lien petit" }, "Marquer comme non faite");
     decocher.addEventListener("click", async () => {
       const maj = { fait: false, fait_le: null, ressenti: null, commentaire: null, distance_km: null, duree_min: null, photo_url: null };
-      try { await pendant(decocher, "…", () => donnees.majSeance(s.id, maj)); Object.assign(s, maj); afficherEtat(); majProgression(); majObjectifsSemaine(); }
+      try { await pendant(decocher, "…", () => donnees.majSeance(s.id, maj)); Object.assign(s, maj); afficherEtat(); majProgression(); majObjectifsSemaine(); surChangement("decochee"); }
       catch (e) { zone.append(el("p", { class: "error" }, messageErreur(e))); }
     });
     zone.append(el("div", { class: "actions" }, [modifier, decocher]));
+  }
+
+  // Retirer une séance pas faite : on demande confirmation dans la carte
+  function demanderRetrait() {
+    const oui = el("button", { type: "button" }, "Oui, la retirer");
+    const non = el("button", { type: "button", class: "ghost" }, "Garder");
+    const erreur = el("p", { class: "error", hidden: "" });
+    oui.addEventListener("click", async () => {
+      try {
+        await pendant(oui, "Retrait…", () => donnees.supprimerSeance(s.id));
+        carte.remove();
+        seancesSemaine = seancesSemaine.filter((x) => x.id !== s.id);
+        majProgression();
+        surChangement("retiree");
+      } catch (e) { erreur.textContent = messageErreur(e); erreur.hidden = false; }
+    });
+    non.addEventListener("click", afficherEtat);
+    zone.replaceChildren(
+      el("p", { class: "confirmation" }, s.coach_id === moi.id
+        ? "Retirer cette séance de ton programme ?"
+        : "Retirer cette séance de ton programme ? Elle disparaîtra aussi de la liste " + de(nomComplet(s.coach)) + "."),
+      el("div", { class: "actions" }, [oui, non]),
+      erreur,
+    );
   }
 
   // Formulaire de ressenti : difficulté + commentaire
@@ -2030,6 +2221,7 @@ function carteSemaine(s) {
         afficherEtat();
         majProgression();
         majObjectifsSemaine();
+        surChangement("cochee");
       } catch (e) {
         erreur.textContent = messageErreur(e);
         erreur.hidden = false;
@@ -2050,6 +2242,118 @@ function carteSemaine(s) {
   afficherEtat();
   return carte;
 }
+
+/* ---------- Vue calendrier (mois) ---------- */
+let vueSemaine = lire("couloir-vue") === "mois" ? "mois" : "semaine";
+let decalageMois = 0;
+let jourChoisi = null;      // « 2026-11-04 »
+let seancesCal = [];
+
+function afficherVue() {
+  document.querySelectorAll("#vue-choix button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vue === vueSemaine)));
+  $("vue-semaine").hidden = vueSemaine !== "semaine";
+  $("vue-mois").hidden = vueSemaine !== "mois";
+  if (vueSemaine === "mois") chargerCalendrier(); else chargerSemaine();
+}
+document.querySelectorAll("#vue-choix button").forEach((b) => b.addEventListener("click", () => {
+  vueSemaine = b.dataset.vue;
+  ecrire("couloir-vue", vueSemaine);
+  afficherVue();
+}));
+
+// Le jour où une séance compte : le jour où elle a été faite, sinon le jour prévu
+function jourCalendrier(s) {
+  if (s.fait) return isoLocal(jourDeSeance(s));
+  return s.date || null;
+}
+function etatCal(s, aujourdhuiIso) {
+  if (s.fait) return "fait";
+  return s.date < aujourdhuiIso ? "manque" : "prevu";
+}
+
+async function chargerCalendrier() {
+  const premier = new Date(new Date().getFullYear(), new Date().getMonth() + decalageMois, 1);
+  const titre = premier.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  $("mois-titre").textContent = titre.charAt(0).toUpperCase() + titre.slice(1);
+  $("cal-jours").replaceChildren(el("p", { class: "muted", style: "grid-column: 1 / -1" }, "Chargement…"));
+  try {
+    seancesCal = await donnees.toutesMesSeances(moi.id);
+  } catch (e) {
+    $("cal-jours").replaceChildren(el("p", { class: "error", style: "grid-column: 1 / -1" }, messageErreur(e)));
+    return;
+  }
+  // Par défaut : aujourd'hui si on regarde le mois en cours
+  const auj = aujourdhui();
+  if (!jourChoisi || jourChoisi.slice(0, 7) !== isoLocal(premier).slice(0, 7)) {
+    jourChoisi = auj.slice(0, 7) === isoLocal(premier).slice(0, 7) ? auj : null;
+  }
+  dessinerCalendrier();
+}
+
+function dessinerCalendrier() {
+  const premier = new Date(new Date().getFullYear(), new Date().getMonth() + decalageMois, 1);
+  const moisIso = isoLocal(premier).slice(0, 7);
+  const auj = aujourdhui();
+  const parJour = {};
+  seancesCal.forEach((s) => { const j = jourCalendrier(s); if (j) (parJour[j] ||= []).push(s); });
+
+  // De lundi (avant le 1er) à dimanche (après le dernier jour du mois)
+  const debut = lundiDe(premier);
+  const dernier = new Date(premier.getFullYear(), premier.getMonth() + 1, 0);
+  const fin = lundiDe(dernier); fin.setDate(fin.getDate() + 6);
+  const cases = [];
+  for (const d = new Date(debut); d <= fin; d.setDate(d.getDate() + 1)) {
+    const iso = isoLocal(d);
+    const liste = parJour[iso] || [];
+    const etats = liste.map((s) => etatCal(s, auj));
+    const nb = (e) => etats.filter((x) => x === e).length;
+    const resume = [nb("fait") && pluriel(nb("fait"), "séance") + " faite" + (nb("fait") > 1 ? "s" : ""),
+      nb("prevu") && pluriel(nb("prevu"), "séance") + " prévue" + (nb("prevu") > 1 ? "s" : ""),
+      nb("manque") && pluriel(nb("manque"), "séance") + " pas faite" + (nb("manque") > 1 ? "s" : "")].filter(Boolean).join(", ");
+    const b = el("button", {
+      type: "button",
+      class: "jour" + (iso.slice(0, 7) !== moisIso ? " hors-mois" : "") + (iso === auj ? " aujourdhui" : "") + (iso === jourChoisi ? " choisi" : ""),
+      "aria-label": d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }) + (resume ? " : " + resume : ""),
+      "aria-pressed": String(iso === jourChoisi),
+    }, [
+      el("span", {}, String(d.getDate())),
+      el("span", { class: "points", "aria-hidden": "true" }, etats.slice(0, 3).map((e) => el("i", { class: "point " + e }))),
+    ]);
+    b.addEventListener("click", () => { jourChoisi = iso; dessinerCalendrier(); });
+    cases.push(b);
+  }
+  $("cal-jours").replaceChildren(...cases);
+  afficherJour(parJour[jourChoisi] || []);
+}
+
+// Le détail du jour choisi, sous le calendrier
+function afficherJour(liste) {
+  const zone = $("cal-detail");
+  if (!jourChoisi) { $("cal-titre-jour").textContent = ""; zone.replaceChildren(el("p", { class: "muted" }, "Touche un jour pour voir ses séances.")); return; }
+  const t = formatDate(jourChoisi);
+  $("cal-titre-jour").textContent = t.charAt(0).toUpperCase() + t.slice(1);
+  if (!liste.length) { zone.replaceChildren(el("p", { class: "vide" }, "Aucune séance ce jour-là.")); return; }
+  const redessiner = () => dessinerCalendrier();
+  zone.replaceChildren(...liste.map((s) => {
+    // Séance du coach : on peut la cocher, donner son ressenti ou la retirer
+    if (s.coach_id) return carteSemaine(s, (quoi) => {
+      if (quoi === "retiree") seancesCal = seancesCal.filter((x) => x.id !== s.id);
+      redessiner();
+    });
+    // Séance publiée de son côté : on affiche le détail
+    return el("article", { class: "seance faite" }, [
+      enTeteSeance(s),
+      s.titre ? el("p", { class: "seance-titre" }, s.titre) : null,
+      s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : null,
+      etatEffort(s, [el("span", { class: "pill faite" }, s.principal === false ? "✓ Faite à plusieurs" : "✓ Publiée")]),
+      photoDeSeance(s),
+      s.commentaire ? el("blockquote", { class: "commentaire" }, s.commentaire) : null,
+    ]);
+  }));
+}
+
+$("mois-prec").addEventListener("click", () => { decalageMois--; jourChoisi = null; chargerCalendrier(); });
+$("mois-suiv").addEventListener("click", () => { decalageMois++; jourChoisi = null; chargerCalendrier(); });
 
 $("sem-prec").addEventListener("click", () => { decalageSemaine--; chargerSemaine(); });
 $("sem-suiv").addEventListener("click", () => { decalageSemaine++; chargerSemaine(); });
@@ -2072,10 +2376,18 @@ async function afficherPlanifier() {
   try { athletes = [moiMeme, ...(await donnees.athletes())]; }
   catch (e) { athletes = [moiMeme]; afficherMessage("erreur-seance", messageErreur(e)); }
 
-  const dejaChoisi = choixAthlete.value;
-  choixAthlete.replaceChildren(...athletes.map((a) => el("option", { value: a.id },
-    a.estMoi ? "Moi-même (" + a.prenom + ")" : nomComplet(a) + (a.discipline ? " · " + a.discipline : ""))));
-  if (athletes.some((a) => a.id === dejaChoisi)) choixAthlete.value = dejaChoisi;
+  const dejaChoisi = choixAthlete.value || "tous";
+  choixAthlete.replaceChildren(
+    el("option", { value: "tous" }, "Toutes les personnes"),
+    ...athletes.map((a) => el("option", { value: a.id },
+      a.estMoi ? "Moi-même (" + a.prenom + ")" : nomComplet(a) + (a.discipline ? " · " + a.discipline : ""))),
+  );
+  choixAthlete.value = athletes.some((a) => a.id === dejaChoisi) ? dejaChoisi : "tous";
+
+  // Destinataires : on garde les cases déjà cochées
+  const cochesAvant = choixDestinataires ? choixDestinataires.valeurs() : [];
+  choixDestinataires = choixPersonnes("dest", athletes, { coches: cochesAvant, raccourcis: true });
+  $("destinataires").replaceChildren(choixDestinataires.bloc);
 
   const aucun = athletes.length === 0;
   $("coach-aucun").hidden = !aucun;
@@ -2084,9 +2396,15 @@ async function afficherPlanifier() {
   $("coach-seances").hidden = aucun;
   if (!aucun) afficherSeancesCoach();
 }
+let choixDestinataires = null;
 
-function carteCoach(s) {
+function carteCoach(s, avecNom = false) {
+  const qui = s.athlete;
   const carte = el("article", { class: "seance" + (s.fait ? " faite" : "") }, [
+    avecNom && qui ? el("div", { class: "post-tete" }, [
+      lienPersonne(qui, avatarEl(qui, "mini"), "personne avatar-lien"),
+      lienPersonne(qui, el("b", {}, qui.id === moi.id ? "Moi-même" : nomComplet(qui))),
+    ]) : null,
     enTeteSeance(s),
     s.titre ? el("p", { class: "seance-titre" }, s.titre) : null,
     s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : null,
@@ -2111,26 +2429,42 @@ function carteCoach(s) {
   return carte;
 }
 
+let numeroListeCoach = 0; // pour ignorer une réponse arrivée après un changement de filtre
 async function afficherSeancesCoach() {
-  const athlete = athletes.find((a) => a.id === choixAthlete.value);
+  const athlete = athletes.find((a) => a.id === choixAthlete.value) || null; // null = toutes les personnes
+  const jour = $("filtre-jour").value || null;
   const zone = $("coach-seances");
-  if (!athlete) { zone.replaceChildren(); return; }
-  $("coach-titre-liste").textContent = athlete.estMoi ? "Mes propres séances" : "Séances de " + athlete.prenom;
-  $("voir-profil-athlete").hidden = !!athlete.estMoi;
+  const qui = !athlete ? "Toutes les séances données" : athlete.estMoi ? "Mes propres séances" : "Séances " + de(athlete.prenom);
+  $("coach-titre-liste").textContent = qui + (jour ? " · " + formatDate(jour) : "");
+  $("voir-profil-athlete").hidden = !athlete || !!athlete.estMoi;
+  $("filtre-tous-jours").hidden = !jour;
   zone.replaceChildren(el("p", { class: "muted" }, "Chargement…"));
+  const numero = ++numeroListeCoach;
   try {
-    const seances = await donnees.seancesDuCoachPour(athlete.id);
+    const seances = await donnees.seancesDonnees(moi.id, { athleteId: athlete ? athlete.id : null, jour });
+    if (numero !== numeroListeCoach) return;
     zone.replaceChildren();
-    if (seances.length === 0) zone.append(el("p", { class: "vide" }, athlete.estMoi
-      ? "Tu ne t'es encore fixé aucune séance. Elles apparaîtront aussi dans ton onglet « Ma semaine »."
-      : "Aucune séance envoyée à " + athlete.prenom + " pour l'instant."));
-    else seances.forEach((s) => zone.append(carteCoach(s)));
+    if (seances.length === 0) {
+      const ceJour = jour ? " ce jour-là" : "";
+      zone.append(el("p", { class: "vide" }, !athlete ? "Aucune séance donnée" + ceJour + "."
+        : athlete.estMoi ? "Tu ne t'es fixé aucune séance" + ceJour + ". Elles apparaissent aussi dans ton onglet « Semaine »."
+        : "Aucune séance envoyée à " + athlete.prenom + ceJour + "."));
+    } else {
+      // Avec plusieurs personnes : un résumé « faites / à faire »
+      if (!athlete) {
+        const faites = seances.filter((s) => s.fait).length;
+        zone.append(el("p", { class: "muted petit" }, pluriel(seances.length, "séance") + " · " + faites + " faite" + (faites > 1 ? "s" : "") + " · " + (seances.length - faites) + " à faire"));
+      }
+      seances.forEach((s) => zone.append(carteCoach(s, !athlete)));
+    }
   } catch (e) {
-    zone.replaceChildren(el("p", { class: "error" }, messageErreur(e)));
+    if (numero === numeroListeCoach) zone.replaceChildren(el("p", { class: "error" }, messageErreur(e)));
   }
 }
 
 choixAthlete.addEventListener("change", () => { afficherMessage("ok-seance", ""); afficherSeancesCoach(); });
+$("filtre-jour").addEventListener("change", afficherSeancesCoach);
+$("filtre-tous-jours").addEventListener("click", () => { $("filtre-jour").value = ""; afficherSeancesCoach(); });
 $("voir-profil-athlete").addEventListener("click", () => {
   const a = athletes.find((x) => x.id === choixAthlete.value);
   if (a && !a.estMoi) voirProfil(a);
@@ -2155,9 +2489,10 @@ function commencerModif(s) {
   $("seance-date").value = s.date || "";
   $("seance-consignes").value = s.consignes || "";
   choixAthlete.disabled = true;
-  const athlete = athletes.find((a) => a.id === choixAthlete.value);
+  $("bloc-destinataires").hidden = true;
+  const athlete = s.athlete || athletes.find((a) => a.id === choixAthlete.value);
   $("info-modif").textContent = "Tu modifies la séance « " + (s.titre || "sans titre") + " »"
-    + (athlete && !athlete.estMoi ? " de " + athlete.prenom : "") + ".";
+    + (athlete && athlete.id !== moi.id ? " " + de(athlete.prenom) : "") + ".";
   $("info-modif").hidden = false;
   $("bouton-seance").textContent = "Enregistrer les modifications";
   $("annuler-modif").hidden = false;
@@ -2170,6 +2505,7 @@ function commencerModif(s) {
 function finirModif() {
   seanceEnModif = null;
   choixAthlete.disabled = false;
+  $("bloc-destinataires").hidden = false;
   $("info-modif").hidden = true;
   $("bouton-seance").textContent = "Envoyer la séance";
   $("annuler-modif").hidden = true;
@@ -2205,14 +2541,19 @@ $("form-seance").addEventListener("submit", async (event) => {
     return;
   }
 
+  const ids = choixDestinataires ? choixDestinataires.valeurs() : [];
+  if (!ids.length) return afficherMessage("erreur-seance", "Choisis au moins une personne dans « Pour qui ? ».");
   try {
-    await pendant($("bouton-seance"), "Envoi…", () => donnees.envoyerSeance({
-      athlete_id: athlete.id, coach_id: moi.id, date, type: typeChoisi,
+    // Une séance par personne : chacun la coche et donne son ressenti de son côté
+    await pendant($("bouton-seance"), "Envoi…", () => donnees.envoyerSeance(ids.map((id) => ({
+      athlete_id: id, coach_id: moi.id, date, type: typeChoisi,
       titre: titre || null, contenu: contenu || null, consignes,
-    }));
-    // Le formulaire reste rempli : on peut envoyer la même séance à un autre athlète
-    afficherMessage("ok-seance", (athlete.estMoi ? "Séance ajoutée à ta semaine." : "Séance envoyée à " + athlete.prenom + ".")
-      + " Pour envoyer la même à quelqu'un d'autre, change d'athlète et clique à nouveau sur « Envoyer ».");
+    }))));
+    const noms = ids.map((id) => { const a = athletes.find((x) => x.id === id); return a.estMoi ? "toi" : a.prenom; });
+    const liste = noms.length > 1 ? noms.slice(0, -1).join(", ") + " et " + noms[noms.length - 1] : noms[0];
+    afficherMessage("ok-seance", "Séance envoyée à " + liste + ".");
+    // La liste du bas montre tout le monde si la personne affichée n'était pas dans l'envoi
+    if (choixAthlete.value !== "tous" && !ids.includes(choixAthlete.value)) choixAthlete.value = "tous";
     afficherSeancesCoach();
   } catch (e) {
     afficherMessage("erreur-seance", messageErreur(e));
@@ -2693,8 +3034,8 @@ async function afficherProfil() {
   if (estMoi) $("panneau-profil").style.removeProperty("--track");
   else $("panneau-profil").style.setProperty("--track", couleurDe(p));
   $("profil-modifier").hidden = !estMoi;
-  $("titre-stats").textContent = estMoi ? "Mes statistiques" : "Statistiques de " + p.prenom;
-  $("titre-courbe").textContent = estMoi ? "Mon évolution" : "Évolution de " + p.prenom;
+  $("titre-stats").textContent = estMoi ? "Mes statistiques" : "Statistiques " + de(p.prenom);
+  $("titre-courbe").textContent = estMoi ? "Mon évolution" : "Évolution " + de(p.prenom);
 
   $("profil-form").hidden = true;
   $("profil-vue").hidden = false;
@@ -2709,7 +3050,7 @@ async function afficherProfil() {
   $("mes-trophees").replaceChildren();
 
   // Records
-  $("titre-records").textContent = estMoi ? "Mes records" : "Records de " + p.prenom;
+  $("titre-records").textContent = estMoi ? "Mes records" : "Records " + de(p.prenom);
   const records = Array.isArray(p.records) ? p.records : [];
   $("profil-records").hidden = !estMoi && records.length === 0;
   $("records-contenu").replaceChildren(records.length
@@ -2717,7 +3058,7 @@ async function afficherProfil() {
     : el("p", { class: "vide" }, "Pas encore de record. Ajoute tes meilleures performances avec « Modifier mon profil »."));
 
   // Objectifs (les barres arrivent avec les statistiques)
-  $("titre-objectifs").textContent = estMoi ? "Mes objectifs de la semaine" : "Objectifs de " + p.prenom + " cette semaine";
+  $("titre-objectifs").textContent = estMoi ? "Mes objectifs de la semaine" : "Objectifs " + de(p.prenom) + " cette semaine";
   const aDesObjectifs = p.objectif_km > 0 || p.objectif_seances > 0;
   $("profil-objectifs").hidden = !estMoi && !aDesObjectifs;
   $("objectifs-contenu").replaceChildren(aDesObjectifs
