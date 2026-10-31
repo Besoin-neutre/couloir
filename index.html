@@ -492,12 +492,8 @@ details.anciennes .versions { gap: 10px; }
   color: #fff; font-size: 14px; font-weight: 600; background: rgba(0, 0, 0, .4); padding: 2px 10px; border-radius: 99px;
 }
 
-/* GIF dans les commentaires */
-.bouton-gif { padding: 8px 10px; font-size: 13px; font-weight: 700; letter-spacing: .04em; }
-.panneau-gif { display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 8px; }
-.panneau-gif .bouton-fichier { padding: 8px 12px; font-size: 15px; }
-.gif-apercu { display: grid; gap: 6px; justify-items: start; }
-.gif-apercu img, .com-gif { max-width: 220px; max-height: 220px; border-radius: 8px; display: block; }
+/* Anciens GIF et mentions dans les commentaires */
+.com-gif { max-width: 220px; max-height: 220px; border-radius: 8px; display: block; }
 .com-gif { cursor: zoom-in; margin-top: 4px; }
 
 /* Notifications et espace utilisé */
@@ -509,6 +505,11 @@ details.anciennes .versions { gap: 10px; }
 .notifs-choix .option input { flex: none; margin-top: 2px; }
 .espace.attention .barre span { background: var(--moyen); }
 .espace.plein .barre span { background: var(--erreur); }
+
+.mention { font-weight: 700 !important; }
+.mentions-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+.mentions-suggestions .suggestion { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 4px; border-radius: 999px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); font-size: 15px; font-weight: 600; }
+.mentions-suggestions .suggestion:hover, .mentions-suggestions .suggestion:focus-visible { border-color: var(--track); }
 
 /* Prénoms cliquables */
 button.personne { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-align: left; border-radius: 4px; }
@@ -1112,11 +1113,6 @@ const donnees = {
       .eq("athlete_id", moiId).eq("principal", false).eq("fait", false).is("coach_id", null);
     if (error) throw error;
     return count || 0;
-  },
-  async envoyerGif(profilId, blob, extension) {
-    const chemin = profilId + "/gifs/" + Date.now() + "." + extension;
-    verifier(await sb.storage.from("photos").upload(chemin, blob, { contentType: blob.type || "image/gif" }));
-    return sb.storage.from("photos").getPublicUrl(chemin).data.publicUrl;
   },
   async supprimerGroupe(groupeId) { verifier(await sb.from("seances").delete().eq("groupe_id", groupeId)); },
   async semaine(athleteId, debut, fin) {
@@ -2076,6 +2072,11 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "2.1", nom: "@ toi", date: "31 octobre 2026", nouveautes: [
+    "On peut mentionner quelqu'un dans un commentaire : tape @ puis choisis son prénom.",
+    "La personne mentionnée reçoit une notification (on peut la couper dans son profil).",
+    "Les GIF disparaissent des commentaires pour garder de la place pour les photos.",
+  ] },
   { num: "2.0", nom: "Ding !", date: "31 octobre 2026", nouveautes: [
     "Les notifications arrivent sur le téléphone : séance du coach, séance à valider, commentaires, réactions (et, pour le coach, quand un athlète fait sa séance).",
     "Chacun choisit dans son profil les notifications qu'il veut recevoir.",
@@ -2388,72 +2389,86 @@ function carteFil(s) {
   return carte;
 }
 
-/* ---------- GIF dans les commentaires ----------
-   Deux façons : choisir un GIF (ou une image) sur son téléphone, ou coller un lien (Giphy, Tenor…). */
+/* ---------- Anciens GIF des commentaires (on ne peut plus en ajouter) ---------- */
 function gifCommentaire(src) {
   const img = el("img", { class: "com-gif", src, alt: "GIF", loading: "lazy" });
   img.addEventListener("click", () => ouvrirVisionneuse(src, 0, "GIF"));
   return img;
 }
-// Transforme un lien de page Giphy en lien direct vers le GIF
-function lienGifDirect(texte) {
-  let u;
-  try { u = new URL(texte.trim()); } catch (e) { return null; }
-  if (u.protocol !== "https:") return null;
-  const giphy = u.hostname.endsWith("giphy.com") && u.pathname.match(/(?:gifs|media|stickers)\/(?:[^/]*-)?([A-Za-z0-9]+)(?:\/|$)/);
-  if (giphy && !/\.(gif|webp)$/i.test(u.pathname)) return "https://media.giphy.com/media/" + giphy[1] + "/giphy.gif";
-  if (/\.(gif|webp|png|jpe?g)$/i.test(u.pathname) || u.hostname.startsWith("media.tenor.com") || u.hostname.startsWith("media") && u.hostname.endsWith("giphy.com")) return u.href;
-  return null;
+
+/* ---------- Mentions « @Prénom » dans les commentaires ---------- */
+const memeTexte = (a, b) => a.localeCompare(b, "fr", { sensitivity: "base" }) === 0;
+const lettreOuChiffre = (c) => !!c && /[\p{L}\p{N}]/u.test(c);
+// Découpe un texte en morceaux : du texte, ou une personne mentionnée (le prénom le plus long l'emporte)
+function morceauxMentions(texte) {
+  const tri = profilsConnus.filter((p) => p.prenom).slice().sort((a, b) => b.prenom.length - a.prenom.length);
+  const morceaux = [];
+  let debut = 0;
+  for (let i = 0; i < texte.length; i++) {
+    if (texte[i] !== "@" || lettreOuChiffre(texte[i - 1])) continue;
+    const p = tri.find((x) => memeTexte(texte.slice(i + 1, i + 1 + x.prenom.length), x.prenom) && !lettreOuChiffre(texte[i + 1 + x.prenom.length]));
+    if (!p) continue;
+    if (i > debut) morceaux.push(texte.slice(debut, i));
+    morceaux.push(p);
+    debut = i = i + 1 + p.prenom.length;
+    i--;
+  }
+  if (debut < texte.length) morceaux.push(texte.slice(debut));
+  return morceaux;
 }
-function panneauGif(prefixe, signaler) {
-  let fichier = null, lien = null, apercuUrl = null;
-  const input = el("input", { type: "file", id: prefixe + "-fichier", accept: "image/gif,image/*", class: "visuellement-cache" });
-  const choisir = el("label", { class: "bouton-fichier compact-fichier" }, ["Choisir sur mon téléphone", input]);
-  const champLien = el("input", { type: "url", id: prefixe + "-lien", placeholder: "ou colle un lien de GIF (Giphy…)", autocomplete: "off", "aria-label": "Lien d'un GIF" });
-  const apercu = el("div", { class: "gif-apercu", hidden: "" });
-  const retirer = el("button", { type: "button", class: "lien petit" }, "Retirer le GIF");
-  retirer.addEventListener("click", vider);
-  function montrer(src) {
-    apercu.replaceChildren(el("img", { src, alt: "Aperçu du GIF" }), retirer);
-    apercu.hidden = false;
-  }
-  input.addEventListener("change", () => {
-    const f = input.files[0];
-    input.value = "";
-    if (!f) return;
-    if (f.size > 6 * 1024 * 1024) { signaler("Ce GIF est trop lourd (6 Mo maximum)."); return; }
-    signaler("");
-    fichier = f; lien = null; champLien.value = "";
-    if (apercuUrl) URL.revokeObjectURL(apercuUrl);
-    apercuUrl = URL.createObjectURL(f);
-    montrer(apercuUrl);
+function texteAvecMentions(texte) {
+  return morceauxMentions(texte).map((m) => {
+    if (typeof m === "string") return m;
+    const b = lienPersonne(m, "@" + m.prenom, "personne mention");
+    b.style.color = couleurDe(m);
+    return b;
   });
-  champLien.addEventListener("input", () => {
-    const t = champLien.value.trim();
-    if (!t) { lien = null; if (!fichier) apercu.hidden = true; signaler(""); return; }
-    const direct = lienGifDirect(t);
-    if (!direct) { lien = null; signaler("Ce lien ne mène pas directement à un GIF. Sur Giphy, copie le lien du GIF ; sinon, un lien qui finit par .gif."); return; }
-    signaler("");
-    lien = direct; fichier = null;
-    montrer(direct);
-  });
-  function vider() {
-    fichier = null; lien = null; champLien.value = "";
-    if (apercuUrl) { URL.revokeObjectURL(apercuUrl); apercuUrl = null; }
-    apercu.hidden = true; apercu.replaceChildren();
+}
+// Liste de prénoms qui s'ouvre quand on tape « @ » dans un champ
+function suggestionsMentions(champ) {
+  const liste = el("div", { class: "mentions-suggestions", role: "listbox", "aria-label": "Mentionner quelqu'un", hidden: "" });
+  let debutMention = -1;
+  function recherche() {
+    const pos = champ.selectionStart ?? champ.value.length;
+    const avant = champ.value.slice(0, pos);
+    const at = avant.lastIndexOf("@");
+    if (at < 0 || lettreOuChiffre(avant[at - 1])) return null;
+    const requete = avant.slice(at + 1);
+    if (requete.length > 30 || /\n/.test(requete)) return null;
+    return { at, requete };
   }
-  return {
-    bloc: el("div", { class: "panneau-gif", hidden: "" }, [el("div", { class: "actions" }, [choisir]), champLien, apercu]),
-    aUnGif: () => !!(fichier || lien),
-    vider,
-    async url(profilId) {
-      if (lien) return lien;
-      if (!fichier) return null;
-      // Un GIF garde son animation : on l'envoie tel quel ; une photo est d'abord réduite
-      if (fichier.type === "image/gif") return donnees.envoyerGif(profilId, fichier, "gif");
-      return donnees.envoyerGif(profilId, await preparerImage(fichier, 800), "jpg");
-    },
-  };
+  function majListe() {
+    const r = recherche();
+    const choix = !r ? [] : profilsConnus.filter((p) => p.prenom && (!moi || p.id !== moi.id)
+      && memeTexte(p.prenom.slice(0, r.requete.length), r.requete)).slice(0, 6);
+    if (!choix.length) { liste.hidden = true; liste.replaceChildren(); debutMention = -1; return; }
+    debutMention = r.at;
+    liste.replaceChildren(...choix.map((p) => {
+      const b = el("button", { type: "button", class: "suggestion", role: "option" }, [avatarEl(p, "mini"), el("span", {}, p.prenom)]);
+      b.addEventListener("pointerdown", (e) => e.preventDefault()); // garde le clavier ouvert
+      b.addEventListener("click", () => choisir(p));
+      return b;
+    }));
+    liste.hidden = false;
+  }
+  function choisir(p) {
+    const pos = champ.selectionStart ?? champ.value.length;
+    const insertion = "@" + p.prenom + " ";
+    champ.value = champ.value.slice(0, debutMention) + insertion + champ.value.slice(pos);
+    const curseur = debutMention + insertion.length;
+    champ.focus();
+    champ.setSelectionRange(curseur, curseur);
+    majListe();
+  }
+  champ.addEventListener("input", majListe);
+  champ.addEventListener("click", majListe);
+  champ.addEventListener("keydown", (e) => {
+    if (liste.hidden) return;
+    if (e.key === "Escape") { liste.hidden = true; e.preventDefault(); }
+    if (e.key === "Tab" || (e.key === "Enter" && !e.isComposing)) { e.preventDefault(); liste.querySelector("button").click(); }
+  });
+  champ.addEventListener("blur", () => setTimeout(() => { liste.hidden = true; }, 150));
+  return { liste, fermer() { liste.hidden = true; } };
 }
 
 // Réactions sous un post : 👏 🔥 💪, un clic pour ajouter ou retirer la sienne
@@ -2536,7 +2551,7 @@ function zoneCommentaires(s) {
     return el("div", { class: "com" }, [
       lienPersonne(c.auteur, avatarEl(c.auteur, "mini"), "personne avatar-lien"),
       el("div", { class: "com-corps" }, [
-        el("p", { class: "com-texte" }, [lienPersonne(c.auteur, el("b", {}, nomComplet(c.auteur))), c.texte ? " " + c.texte : ""]),
+        el("p", { class: "com-texte" }, [lienPersonne(c.auteur, el("b", {}, nomComplet(c.auteur))), ...(c.texte ? [" ", ...texteAvecMentions(c.texte)] : [])]),
         c.gif_url ? gifCommentaire(c.gif_url) : null,
         meta,
       ]),
@@ -2553,28 +2568,21 @@ function zoneCommentaires(s) {
     (toutVoir ? coms : coms.slice(-2)).forEach((c) => liste.append(ligne(c)));
   }
 
-  const champ = el("input", { type: "text", id: "com-input-" + s.id, maxlength: "500", placeholder: "Ajouter un commentaire…", "aria-label": "Ajouter un commentaire", autocomplete: "off" });
-  const boutonGif = el("button", { type: "button", class: "ghost bouton-gif", "aria-expanded": "false", "aria-label": "Ajouter un GIF" }, "GIF");
+  const champ = el("input", { type: "text", id: "com-input-" + s.id, maxlength: "500", placeholder: "Commenter… (@prénom)", "aria-label": "Ajouter un commentaire (tape @ pour mentionner quelqu'un)", autocomplete: "off", autocapitalize: "sentences" });
+  const mentions = suggestionsMentions(champ);
   const envoyer = el("button", { type: "submit" }, "Envoyer");
   const erreur = el("p", { class: "error", hidden: "" });
-  const gif = panneauGif("gif-" + s.id, (msg) => { erreur.textContent = msg; erreur.hidden = !msg; });
-  boutonGif.addEventListener("click", () => {
-    gif.bloc.hidden = !gif.bloc.hidden;
-    boutonGif.setAttribute("aria-expanded", String(!gif.bloc.hidden));
-  });
-  const form = el("form", { class: "com-form", novalidate: "" }, [champ, boutonGif, envoyer]);
+  const form = el("form", { class: "com-form", novalidate: "" }, [champ, envoyer]);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const texte = champ.value.trim();
-    if ((!texte && !gif.aUnGif()) || !moi) return;
+    if (!texte || !moi) return;
     erreur.hidden = true;
+    mentions.fermer();
     try {
-      const c = await pendant(envoyer, "…", async () => donnees.commenter(s.id, moi.id, texte, await gif.url(moi.id)));
+      const c = await pendant(envoyer, "…", () => donnees.commenter(s.id, moi.id, texte));
       coms.push(c);
       champ.value = "";
-      gif.vider();
-      gif.bloc.hidden = true;
-      boutonGif.setAttribute("aria-expanded", "false");
       rendre();
     } catch (e) {
       erreur.textContent = messageErreur(e);
@@ -2583,7 +2591,7 @@ function zoneCommentaires(s) {
   });
 
   rendre();
-  return el("div", { class: "commentaires" }, [liste, form, gif.bloc, erreur]);
+  return el("div", { class: "commentaires" }, [liste, form, mentions.liste, erreur]);
 }
 
 /* ---------- Séances proposées : quelqu'un a couru avec moi ---------- */
@@ -3942,7 +3950,7 @@ async function afficherProfil() {
     cal.charger();
     const barres = barresObjectifs(p, st.w);
     if (barres) $("objectifs-contenu").replaceChildren(...barres);
-    if (estMoi) { $("profil-notifs").hidden = false; afficherNotifs(); afficherEspace(); }
+    if (estMoi) { $("profil-notifs").hidden = false; afficherNotifs(); if (moi.id === ID_TOMI) afficherEspace(); }
   } catch (e) {
     $("stats-tuiles").replaceChildren(el("p", { class: "error" }, messageErreur(e)));
   }
@@ -4009,12 +4017,14 @@ function afficherMesTrophees(stats, p = moi) {
 }
 
 /* ---------- Notifications ---------- */
+const ID_TOMI = "74370ba6-0934-4127-960e-bfd87fe0b3ea"; // seul Tomi voit l'espace utilisé
 const VAPID_PUBLIQUE = "BB5sEDvrFzhgtxNxa1XJ37gHIQGfg0zpKkWDPamN6QP0uT1D9xrZ0PChi1PDFky0mJqE9Sx7EkDFyTVgMVrhGvE";
 const TYPES_NOTIFS = [
   { cle: "seance_coach", nom: "Quand le coach m'envoie une séance" },
   { cle: "proposition", nom: "Quand quelqu'un a couru avec moi (séance à valider)" },
   { cle: "commentaire", nom: "Quand on commente mes séances" },
   { cle: "reaction", nom: "Quand on réagit à mes séances (👏 🔥 💪)" },
+  { cle: "mention", nom: "Quand on me mentionne (@) dans un commentaire" },
   { cle: "seance_faite", nom: "Quand un athlète fait une séance que je lui ai donnée", coach: true },
 ];
 let enregistrementSW = null;
@@ -4115,7 +4125,7 @@ async function afficherEspace() {
   try {
     const u = await donnees.utilisation();
     $("espace-contenu").replaceChildren(
-      barreEspace("Photos et GIF", Number(u.fichiers) || 0, 1e9),
+      barreEspace("Photos", Number(u.fichiers) || 0, 1e9),
       barreEspace("Séances et textes", Number(u.base) || 0, 5e8),
       el("p", { class: "aide" }, "Au-delà, l'offre payante de Supabase coûte 25 $ par mois. On peut aussi supprimer de vieilles photos."),
     );
