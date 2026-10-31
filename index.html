@@ -520,6 +520,19 @@ details.anciennes .versions { gap: 10px; }
 .filtre-fil > .card .label { margin: 0; }
 #filtre-fil-bouton.actif { border-color: var(--track); color: var(--track); background: color-mix(in srgb, var(--track) 10%, var(--surface)); }
 
+/* Échauffement réglable et texte de séance modifiable */
+.ech-option { display: grid; gap: 10px; }
+.ech-details { display: grid; gap: 12px; padding: 2px 0 2px 12px; border-left: 3px solid var(--line); }
+.ech-details .temps { flex-wrap: nowrap; gap: 6px; }
+.ech-details .temps input { width: 56px; }
+.ech-details .temps input.t-min { width: 64px; }
+.ech-ligne { display: grid; gap: 8px; }
+.texte-seance { display: grid; gap: 6px; }
+.texte-seance input.seance-titre { font-weight: 700; font-size: 17px; }
+.texte-seance textarea.seance-contenu { min-height: 70px; resize: vertical; overflow: hidden; white-space: pre-wrap; }
+.texte-seance .aide { margin: 0; }
+.texte-seance .lien { justify-self: start; }
+
 /* Prénoms cliquables */
 button.personne { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-align: left; border-radius: 4px; }
 button.personne:hover b, button.personne:focus-visible b { text-decoration: underline; text-underline-offset: 3px; }
@@ -1159,6 +1172,11 @@ const donnees = {
   async envoyerSeance(s) { verifier(await sb.from("seances").insert(s)); },
   async majSeance(id, champs) { verifier(await sb.from("seances").update(champs).eq("id", id)); },
   async supprimerSeance(id) { verifier(await sb.from("seances").delete().eq("id", id)); },
+  // Le groupe d'une séance faite à plusieurs, et les copies des autres personnes
+  async groupeDe(id) { return verifier(await sb.from("seances").select("groupe_id, principal").eq("id", id).maybeSingle()); },
+  async compagnons(groupeId) {
+    return verifier(await sb.from("seances").select("id, athlete_id, fait").eq("groupe_id", groupeId).eq("principal", false));
+  },
 
   // Commentaires
   async commenter(seanceId, auteurId, texte, gifUrl = null) {
@@ -1425,9 +1443,13 @@ function champTemps(id, label, secondes, surSaisie = () => {}) {
 }
 
 /* ---------- Modèles de séance ---------- */
-const ECHAUFFEMENT = "Échauffement : 20 min de footing + gammes";
-const ECHAUFFEMENT_VITESSE = "Échauffement : 20 min de footing + gammes + 3 accélérations progressives";
-const RETOUR_AU_CALME = "Retour au calme : 10 min de footing + étirements";
+// Échauffement et retour au calme : réglables (durée du footing + ce qu'on ajoute)
+const ECHAUFFEMENT = { duree: 20 * 60, plus: "gammes", retour: 10 * 60, retourPlus: "étirements" };
+const ECHAUFFEMENT_VITESSE = { ...ECHAUFFEMENT, plus: "gammes + 3 accélérations progressives" };
+function phraseEchauffement(debut, duree, plus) {
+  const morceaux = [duree ? enDuree(duree) + " de footing" : null, plus ? plus.trim() : null].filter(Boolean);
+  return morceaux.length ? debut + " : " + morceaux.join(" + ") : null;
+}
 
 // Chaque modèle : ses champs (les durées, marquées « temps », sont en secondes),
 // puis comment fabriquer le titre et le contenu.
@@ -1535,23 +1557,64 @@ function dureeModele(m, v) { return m && m.remplitDuree && v ? (m.dureeTotale ? 
 
 /* Éditeur « type de séance + champs préremplis », pour le coach et pour les athlètes.
    surChangement(type, valeurs) est appelé à chaque modification. */
-function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = false, apercu: titreApercu = "Aperçu dans le fil", surChangement = () => {} } = {}) {
+function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = false, apercu: titreApercu = "Texte de la séance", surChangement = () => {} } = {}) {
   let type = MODELES[typeInitial] ? typeInitial : "footing";
   const saisies = {}; // ce qui a été tapé, par type (gardé quand on change de type puis qu'on revient)
   const types = el("div", { class: "types" });
   const champs = el("div", { class: "champs" });
   const ech = el("input", { type: "checkbox", id: prefixe + "-echauffement" });
   ech.checked = echauffementCoche;
-  const optionEch = el("label", { class: "option" }, [ech, "Ajouter l'échauffement et le retour au calme"]);
+  const caseEch = el("label", { class: "option" }, [ech, "Ajouter l'échauffement et le retour au calme"]);
+  // Réglages de l'échauffement (gardés par type de séance)
+  const reglagesEch = {};
+  const echDetails = el("div", { class: "ech-details" });
+  const optionEch = el("div", { class: "ech-option" }, [caseEch, echDetails]);
+  function echDe(t = type) { return { ...(MODELES[t].echauffement || ECHAUFFEMENT), ...(reglagesEch[t] || {}) }; }
+  function construireEch() {
+    const e = echDe();
+    const regler = (cle, v) => { reglagesEch[type] = { ...(reglagesEch[type] || {}), [cle]: v }; maj(); };
+    const texte = (id, label, cle, exemple) => {
+      const i = el("input", { id: prefixe + "-" + id, placeholder: exemple, autocomplete: "off" });
+      i.value = e[cle] || "";
+      i.addEventListener("input", () => regler(cle, i.value));
+      return el("div", { class: "field" }, [el("label", { for: i.id }, label), i]);
+    };
+    echDetails.replaceChildren(
+      el("div", { class: "ech-ligne" }, [
+        champTemps(prefixe + "-ech-duree", "Échauffement (footing)", e.duree, (v) => regler("duree", Number.isNaN(v) ? null : v)).bloc,
+        texte("ech-plus", "Puis", "plus", "gammes"),
+      ]),
+      el("div", { class: "ech-ligne" }, [
+        champTemps(prefixe + "-rac-duree", "Retour au calme (footing)", e.retour, (v) => regler("retour", Number.isNaN(v) ? null : v)).bloc,
+        texte("rac-plus", "Puis", "retourPlus", "étirements"),
+      ]),
+    );
+    echDetails.hidden = !ech.checked;
+  }
   const titre = el("input", { id: prefixe + "-titre", placeholder: "Séance de côtes en forêt" });
   const contenu = el("textarea", { id: prefixe + "-contenu", class: "grand", placeholder: "Échauffement, corps de séance, retour au calme…" });
   const libre = el("div", { class: "groupe-libre" }, [
     el("div", { class: "field" }, [el("label", { for: titre.id }, "Titre"), titre]),
     el("div", { class: "field" }, [el("label", { for: contenu.id }, "Contenu"), contenu]),
   ]);
-  const apTitre = el("p", { class: "seance-titre" });
-  const apContenu = el("p", { class: "seance-contenu" });
-  const apercu = el("div", { class: "apercu" }, [el("span", { class: "label" }, titreApercu), apTitre, apContenu]);
+  // Le texte de la séance : écrit tout seul à partir des réglages, mais modifiable à la main
+  const apTitre = el("input", { id: prefixe + "-texte-titre", class: "seance-titre", "aria-label": "Titre de la séance", autocomplete: "off" });
+  const apContenu = el("textarea", { id: prefixe + "-texte-contenu", class: "seance-contenu", rows: "3", "aria-label": "Texte de la séance" });
+  let texteModifie = false, titreModifie = false; // modifiés à la main : ils ne suivent plus les réglages
+  const etatTexte = el("p", { class: "aide" }, "Tu peux modifier ce texte (allures, consignes…).");
+  const revenir = el("button", { type: "button", class: "lien petit", hidden: "" }, "Revenir au texte automatique");
+  revenir.addEventListener("click", () => { texteModifie = titreModifie = false; maj(); });
+  apTitre.addEventListener("input", () => { titreModifie = true; majEtatTexte(); });
+  apContenu.addEventListener("input", () => { texteModifie = true; majEtatTexte(); });
+  function majEtatTexte() {
+    revenir.hidden = !texteModifie && !titreModifie;
+    etatTexte.textContent = texteModifie || titreModifie
+      ? "Texte modifié à la main : il ne suit plus les réglages au-dessus."
+      : "Tu peux modifier ce texte (allures, consignes…).";
+  }
+  function ajusterHauteur() { apContenu.style.height = "auto"; apContenu.style.height = apContenu.scrollHeight + 2 + "px"; }
+  apContenu.addEventListener("input", ajusterHauteur);
+  const apercu = el("div", { class: "apercu texte-seance" }, [el("span", { class: "label" }, titreApercu), apTitre, apContenu, etatTexte, revenir]);
 
   const cle = (c, t = type) => t + "-" + c.id;
   function valeurs() {
@@ -1566,17 +1629,37 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
   function seance() {
     const m = MODELES[type];
     if (m.libre) return { type, titre: titre.value.trim(), contenu: contenu.value.trim(), parametres: null };
+    const auto = texteAuto();
+    const parametres = { ...auto.parametres };
+    if (titreModifie) parametres.titreModifie = true;
+    if (texteModifie) parametres.texteModifie = true;
+    return {
+      type, parametres,
+      titre: titreModifie ? apTitre.value.trim() || auto.titre : auto.titre,
+      contenu: texteModifie ? apContenu.value.trim() : auto.contenu,
+    };
+  }
+  function texteAuto() {
+    const m = MODELES[type];
     const v = valeurs();
     const avecEch = !!(m.echauffement && ech.checked);
     const lignes = [m.corps(v)];
-    if (avecEch) { lignes.unshift(m.echauffement); lignes.push(RETOUR_AU_CALME); }
-    return { type, titre: m.titre(v), contenu: lignes.join("\n"), parametres: { ...v, echauffement: avecEch } };
+    const e = echDe();
+    if (avecEch) {
+      lignes.unshift(phraseEchauffement("Échauffement", e.duree, e.plus));
+      lignes.push(phraseEchauffement("Retour au calme", e.retour, e.retourPlus));
+    }
+    const parametres = { ...v, echauffement: avecEch };
+    if (avecEch) parametres.ech = { duree: e.duree || null, plus: e.plus || "", retour: e.retour || null, retourPlus: e.retourPlus || "" };
+    return { titre: m.titre(v), contenu: lignes.filter(Boolean).join("\n"), parametres };
   }
   function maj() {
     if (!MODELES[type].libre) {
-      const sc = seance();
-      apTitre.textContent = sc.titre;
-      apContenu.textContent = sc.contenu;
+      echDetails.hidden = !ech.checked;
+      const sc = texteAuto();
+      if (!titreModifie) apTitre.value = sc.titre;
+      if (!texteModifie) { apContenu.value = sc.contenu; requestAnimationFrame(ajusterHauteur); }
+      majEtatTexte();
     }
     surChangement(type, valeurs());
   }
@@ -1586,6 +1669,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     apercu.hidden = !!m.libre;
     champs.hidden = !!m.libre;
     optionEch.hidden = !m.echauffement;
+    if (m.echauffement) construireEch();
     champs.replaceChildren(...(m.champs || []).map((c) => {
       const id = prefixe + "-" + type + "-" + c.id;
       if (c.temps) {
@@ -1611,7 +1695,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     const id = prefixe + "-type-" + k;
     const input = el("input", { type: "radio", name: prefixe + "-type", id, value: k });
     if (k === type) input.checked = true;
-    input.addEventListener("change", () => { type = k; construireChamps(); });
+    input.addEventListener("change", () => { type = k; texteModifie = titreModifie = false; construireChamps(); });
     return [input, el("label", { for: id }, m.nom)];
   }));
   ech.addEventListener("change", maj);
@@ -1631,6 +1715,11 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
       if (m && !m.libre && s.parametres) {
         (m.champs || []).forEach((c) => { if (s.parametres[c.id] != null) saisies[cle(c, s.type)] = s.parametres[c.id]; });
         ech.checked = !!s.parametres.echauffement;
+        if (s.parametres.ech) reglagesEch[s.type] = { ...s.parametres.ech };
+        texteModifie = !!s.parametres.texteModifie;
+        titreModifie = !!s.parametres.titreModifie;
+        if (titreModifie) apTitre.value = s.titre || "";
+        if (texteModifie) { apContenu.value = s.contenu || ""; requestAnimationFrame(ajusterHauteur); }
         choisir(s.type);
       } else {
         titre.value = s.titre || "";
@@ -1638,7 +1727,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
         choisir("libre");
       }
     },
-    vider(t) { titre.value = ""; contenu.value = ""; choisir(t); },
+    vider(t) { titre.value = ""; contenu.value = ""; texteModifie = titreModifie = false; choisir(t); },
   };
 }
 
@@ -2207,6 +2296,11 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "2.3", nom: "À ta sauce", date: "1er novembre 2026", nouveautes: [
+    "L'échauffement et le retour au calme se règlent : durée du footing, et ce qu'on ajoute (gammes, accélérations, étirements…).",
+    "Le texte de chaque séance se modifie directement : allures, consignes, tout ce qu'on veut.",
+    "En modifiant sa séance, on peut maintenant ajouter ou retirer les personnes avec qui on a couru.",
+  ] },
   { num: "2.2", nom: "Bloc par bloc", date: "31 octobre 2026", nouveautes: [
     "Le fil peut se trier : on choisit les personnes dont on veut voir les séances.",
     "Nouveau type de séance : le footing fractionné (par exemple 3 × 10 min avec 1 min de récup).",
@@ -2907,11 +3001,21 @@ function ouvrirPublier(existante = null) {
   });
   if (existante) modelePublier.charger(existante);
   $("pub-modele").replaceChildren(modelePublier.bloc);
-  // En modification, on ne change pas les personnes avec qui on a couru
-  $("pub-avec-bloc").hidden = !!existante;
+  // « Avec qui ? » : à la publication, et quand je modifie MA séance (pas celle qu'on me propose)
   const autres = profilsConnus.filter((p) => p.id !== moi.id);
-  choixAvec = choixPersonnes("avec", autres);
-  $("pub-avec").replaceChildren(autres.length ? choixAvec.bloc : el("p", { class: "muted petit" }, "Personne d'autre n'est encore inscrit."));
+  compagnonsAvant = [];
+  groupeEnModif = null;
+  choixAvec = null;
+  $("pub-avec-bloc").hidden = !!existante && !existante.fait;
+  if (!autres.length) {
+    $("pub-avec").replaceChildren(el("p", { class: "muted petit" }, "Personne d'autre n'est encore inscrit."));
+  } else if (!existante) {
+    choixAvec = choixPersonnes("avec", autres);
+    $("pub-avec").replaceChildren(choixAvec.bloc);
+  } else if (existante.fait) {
+    $("pub-avec").replaceChildren(el("p", { class: "muted petit" }, "Chargement…"));
+    chargerAvecEnModif(existante, autres);
+  }
   ressentiPublier = choixRessenti("pub-rpe", s.ressenti || null);
   photoPublier = champPhotos("pub-image", photosDe(s));
   $("pub-photo").replaceChildren(photoPublier.bloc);
@@ -2920,6 +3024,29 @@ function ouvrirPublier(existante = null) {
   $("form-publier").hidden = false;
   $("ouvrir-publier").hidden = true;
   $("form-publier").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+let compagnonsAvant = [], groupeEnModif = null;
+async function chargerAvecEnModif(existante, autres) {
+  try {
+    const g = await donnees.groupeDe(existante.id);
+    if (pubEnModif !== existante) return;
+    // Ma copie d'une séance faite avec quelqu'un d'autre : c'est cette personne qui gère le groupe
+    if (g && g.principal === false) { $("pub-avec-bloc").hidden = true; return; }
+    groupeEnModif = g && g.groupe_id ? g.groupe_id : null;
+    compagnonsAvant = groupeEnModif ? await donnees.compagnons(groupeEnModif) : [];
+    if (pubEnModif !== existante) return;
+    choixAvec = choixPersonnes("avec", autres, { coches: compagnonsAvant.map((c) => c.athlete_id) });
+    const valides = compagnonsAvant.filter((c) => c.fait);
+    valides.forEach((c) => {
+      const i = choixAvec.bloc.querySelector('input[value="' + c.athlete_id + '"]');
+      if (i) { i.disabled = true; i.nextElementSibling.title = "A déjà validé cette séance"; }
+    });
+    $("pub-avec").replaceChildren(choixAvec.bloc, valides.length
+      ? el("p", { class: "aide" }, "Les personnes qui ont déjà validé la séance restent dedans : c'est maintenant aussi la leur.")
+      : null);
+  } catch (e) {
+    $("pub-avec").replaceChildren(el("p", { class: "error" }, messageErreur(e)));
+  }
 }
 function fermerPublier() { pubEnModif = null; $("form-publier").hidden = true; $("ouvrir-publier").hidden = false; }
 $("annuler-publier").addEventListener("click", fermerPublier);
@@ -2935,9 +3062,15 @@ $("form-publier").addEventListener("submit", async (event) => {
     // Modification d'une séance déjà publiée
     if (pubEnModif) {
       const enModif = pubEnModif;
+      // Qui ajouter, qui retirer (seulement ceux qui n'ont pas encore validé)
+      const avec = choixAvec ? choixAvec.valeurs() : null;
+      const ajouts = avec ? avec.filter((id) => !compagnonsAvant.some((c) => c.athlete_id === id)) : [];
+      const retraits = avec ? compagnonsAvant.filter((c) => !c.fait && !avec.includes(c.athlete_id)) : [];
       await pendant($("bouton-publier"), "Enregistrement…", async () => {
         const commun = { type, parametres, date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null, ...effort };
+        const groupe_id = groupeEnModif || (ajouts.length ? nouvelUuid() : null);
         await donnees.majSeance(enModif.id, {
+          ...(groupe_id && !groupeEnModif ? { groupe_id, principal: true } : {}),
           ...commun,
           ressenti: ressentiPublier.valeur(), commentaire: $("pub-commentaire").value.trim() || null,
           ...forme, reps_bpm,
@@ -2946,7 +3079,13 @@ $("form-publier").addEventListener("submit", async (event) => {
           ...(enModif.fait ? {} : { fait: true, fait_le: new Date().toISOString() }),
         });
         // Les personnes avec qui j'ai couru (et qui n'ont pas encore validé) voient la séance corrigée
-        if (enModif.groupe_id && enModif.principal !== false) await donnees.majCompagnons(enModif.groupe_id, commun);
+        if (groupeEnModif) await donnees.majCompagnons(groupeEnModif, commun);
+        for (const c of retraits) await donnees.supprimerSeance(c.id);
+        if (ajouts.length) {
+          await donnees.envoyerSeance(ajouts.map((id) => ({
+            ...commun, coach_id: null, athlete_id: id, groupe_id, principal: false, fait: false, fait_le: null,
+          })));
+        }
       });
       fermerPublier();
       chargerFil(true);
@@ -3613,7 +3752,7 @@ $("form-seance").addEventListener("submit", async (event) => {
 const editeurPlanif = editeurModele("planif", {
   typeInitial: lire("couloir-type") || "footing",
   echauffementCoche: true,
-  apercu: "Aperçu pour l'athlète",
+  apercu: "Texte pour l'athlète",
   surChangement: (type) => { if (typeof seanceEnModif !== "undefined" && !seanceEnModif) ecrire("couloir-type", type); },
 });
 $("planif-modele").replaceChildren(editeurPlanif.bloc);
