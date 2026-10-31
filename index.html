@@ -464,6 +464,42 @@ details.anciennes > summary { font-weight: 600; color: var(--ink); padding: 4px 
 details.anciennes[open] > summary { margin-bottom: 10px; }
 details.anciennes .versions { gap: 10px; }
 
+/* Séparateur de date dans le fil */
+.separateur-date { display: flex; align-items: center; gap: 10px; margin: 6px 0 -2px; color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.separateur-date::before, .separateur-date::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+/* Séances proposées en haut du fil */
+.propositions { display: grid; gap: 12px; }
+.seance.proposee { border: 2px dashed var(--auteur, var(--track)); }
+
+/* Plusieurs photos */
+.galerie { display: flex; flex-wrap: wrap; gap: 8px; }
+.apercu-photos { display: flex; flex-wrap: wrap; gap: 8px; }
+.vignette { position: relative; width: 84px; height: 84px; border-radius: 8px; overflow: hidden; background: var(--line); }
+.vignette img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.retirer-photo {
+  position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; padding: 0; border-radius: 50%;
+  background: rgba(0, 0, 0, .6); color: #fff; border: 0; font-size: 16px; line-height: 1;
+}
+.visionneuse .v-fleche {
+  position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; padding: 0; border-radius: 50%;
+  background: rgba(255, 255, 255, .18); color: #fff; border: 0; font-size: 30px; line-height: 1;
+}
+.visionneuse .v-prec { left: max(10px, env(safe-area-inset-left, 0px)); }
+.visionneuse .v-suiv { right: max(10px, env(safe-area-inset-right, 0px)); }
+.visionneuse .compteur {
+  position: absolute; bottom: max(14px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
+  color: #fff; font-size: 14px; font-weight: 600; background: rgba(0, 0, 0, .4); padding: 2px 10px; border-radius: 99px;
+}
+
+/* GIF dans les commentaires */
+.bouton-gif { padding: 8px 10px; font-size: 13px; font-weight: 700; letter-spacing: .04em; }
+.panneau-gif { display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 8px; }
+.panneau-gif .bouton-fichier { padding: 8px 12px; font-size: 15px; }
+.gif-apercu { display: grid; gap: 6px; justify-items: start; }
+.gif-apercu img, .com-gif { max-width: 220px; max-height: 220px; border-radius: 8px; display: block; }
+.com-gif { cursor: zoom-in; margin-top: 4px; }
+
 /* Prénoms cliquables */
 button.personne { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-align: left; border-radius: 4px; }
 button.personne:hover b, button.personne:focus-visible b { text-decoration: underline; text-underline-offset: 3px; }
@@ -654,7 +690,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
         <fieldset id="pub-avec-bloc">
           <legend class="label">Avec qui ? (facultatif)</legend>
           <div id="pub-avec"></div>
-          <p class="aide">La séance comptera aussi dans leurs statistiques et leurs trophées. Elle n'apparaîtra qu'une fois dans le fil.</p>
+          <p class="aide">Ces personnes recevront la séance en haut de leur fil : elles pourront la valider telle quelle ou la corriger (une répétition de plus, leurs BPM…). Elle n'apparaîtra qu'une fois dans le fil.</p>
         </fieldset>
         <div id="pub-effort"></div>
         <div id="pub-reps"></div>
@@ -672,6 +708,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
         </div>
       </form>
 
+      <div class="propositions" id="propositions" hidden></div>
       <div class="fil" id="fil-liste"></div>
       <button type="button" class="ghost" id="fil-plus" style="justify-self:center" hidden>Voir les séances plus anciennes</button>
     </div>
@@ -936,8 +973,8 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
 function verifier({ data, error }) { if (error) throw error; return data; }
 
 const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url, couleur, objectif_km, objectif_seances, records";
-const CHAMPS_SEANCE = "id, cree_le, date, type, parametres, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, duree_s, forme, bpm_moy, bpm_max, reps_bpm, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
-const CHAMPS_COMMENTAIRE = "id, texte, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url, couleur)";
+const CHAMPS_SEANCE = "id, cree_le, date, type, parametres, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, duree_s, forme, bpm_moy, bpm_max, reps_bpm, vo2max, photos, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
+const CHAMPS_COMMENTAIRE = "id, texte, gif_url, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url, couleur)";
 const CHAMPS_FIL = CHAMPS_SEANCE
   + ", reactions(auteur_id, emoji)"
   + ", athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url, couleur)"
@@ -1008,8 +1045,34 @@ const donnees = {
     return posts;
   },
   // Met à jour les copies d'une séance faite à plusieurs (tout sauf le ressenti personnel)
+  // (seulement pour ceux qui n'ont pas encore validé : leur version validée leur appartient)
   async majCompagnons(groupeId, champs) {
-    verifier(await sb.from("seances").update(champs).eq("groupe_id", groupeId).eq("principal", false));
+    verifier(await sb.from("seances").update(champs).eq("groupe_id", groupeId).eq("principal", false).eq("fait", false));
+  },
+  // Séances qu'on me propose (quelqu'un a couru avec moi) : à valider, modifier ou ignorer
+  async propositions(moiId) {
+    const liste = verifier(await sb.from("seances").select(CHAMPS_SEANCE + ", groupe_id, principal")
+      .eq("athlete_id", moiId).eq("principal", false).eq("fait", false).is("coach_id", null)
+      .order("cree_le", { ascending: false }));
+    const groupes = liste.map((x) => x.groupe_id).filter(Boolean);
+    if (groupes.length) {
+      const auteurs = verifier(await sb.from("seances")
+        .select("groupe_id, athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url, couleur)")
+        .in("groupe_id", groupes).eq("principal", true));
+      liste.forEach((x) => { const a = auteurs.find((y) => y.groupe_id === x.groupe_id); x.par = a ? a.athlete : null; });
+    }
+    return liste;
+  },
+  async nbPropositions(moiId) {
+    const { count, error } = await sb.from("seances").select("id", { count: "exact", head: true })
+      .eq("athlete_id", moiId).eq("principal", false).eq("fait", false).is("coach_id", null);
+    if (error) throw error;
+    return count || 0;
+  },
+  async envoyerGif(profilId, blob, extension) {
+    const chemin = profilId + "/gifs/" + Date.now() + "." + extension;
+    verifier(await sb.storage.from("photos").upload(chemin, blob, { contentType: blob.type || "image/gif" }));
+    return sb.storage.from("photos").getPublicUrl(chemin).data.publicUrl;
   },
   async supprimerGroupe(groupeId) { verifier(await sb.from("seances").delete().eq("groupe_id", groupeId)); },
   async semaine(athleteId, debut, fin) {
@@ -1030,9 +1093,9 @@ const donnees = {
   async supprimerSeance(id) { verifier(await sb.from("seances").delete().eq("id", id)); },
 
   // Commentaires
-  async commenter(seanceId, auteurId, texte) {
+  async commenter(seanceId, auteurId, texte, gifUrl = null) {
     return verifier(await sb.from("commentaires")
-      .insert({ seance_id: seanceId, auteur_id: auteurId, texte })
+      .insert({ seance_id: seanceId, auteur_id: auteurId, texte: texte || null, gif_url: gifUrl })
       .select(CHAMPS_COMMENTAIRE).single());
   },
   // Nouveautés depuis la dernière visite
@@ -1059,7 +1122,7 @@ const donnees = {
   // Pour les statistiques et les trophées : toutes les séances faites et tous les commentaires
   async seancesFaites() {
     return toutLire(() => sb.from("seances")
-      .select("id, athlete_id, date, fait_le, type, ressenti, distance_km, duree_min, duree_s")
+      .select("id, athlete_id, date, fait_le, type, ressenti, distance_km, duree_min, duree_s, bpm_max, reps_bpm, vo2max, photo_url, photos")
       .eq("fait", true).order("id"));
   },
   async tousLesCommentaires() {
@@ -1544,6 +1607,7 @@ function etatEffort(s, debut = []) {
     sec ? el("span", { class: "chip" }, enDuree(sec)) : null,
     allure(km, sec) ? el("span", { class: "chip" }, allure(km, sec)) : null,
     texteBpm(s.bpm_moy, s.bpm_max) ? el("span", { class: "chip coeur" }, texteBpm(s.bpm_moy, s.bpm_max)) : null,
+    s.vo2max ? el("span", { class: "chip" }, "VO2 max " + Number(s.vo2max).toLocaleString("fr-FR")) : null,
   ].filter(Boolean);
   const reps = tableauReps(s.reps_bpm);
   if (!pastilles.length && !reps) return null;
@@ -1601,12 +1665,15 @@ function champsForme(prefixe, s = {}) {
   }
   const moy = caseBpm(prefixe + "-bpm-moy", "BPM moyen", s.bpm_moy);
   const max = caseBpm(prefixe + "-bpm-max", "BPM max", s.bpm_max);
+  const vo2 = el("input", { id: prefixe + "-vo2", type: "text", inputmode: "decimal", placeholder: "48,5", autocomplete: "off" });
+  if (s.vo2max) vo2.value = String(Number(s.vo2max)).replace(".", ",");
   const bloc = el("div", { class: "groupe-libre" }, [
     el("fieldset", {}, [el("legend", { class: "label" }, "Ma forme du jour"), ligne, el("p", { class: "aide" }, "1 = épuisé · 3 = normal · 5 = au top")]),
     el("div", { class: "row" }, [
       el("div", { class: "field" }, [el("label", { for: moy.id }, "BPM moyen"), moy]),
       el("div", { class: "field" }, [el("label", { for: max.id }, "BPM max"), max]),
     ]),
+    el("div", { class: "field", style: "max-width: 220px" }, [el("label", { for: vo2.id }, "VO2 max (facultatif)"), vo2]),
   ]);
   return {
     bloc,
@@ -1614,7 +1681,12 @@ function champsForme(prefixe, s = {}) {
       const c = ligne.querySelector("input:checked");
       const bpm_moy = lireBpm(moy, "BPM moyen"), bpm_max = lireBpm(max, "BPM max");
       if (bpm_moy && bpm_max && bpm_moy > bpm_max) throw erreurLisible("Le BPM moyen ne peut pas être plus élevé que le BPM max.");
-      return { forme: c ? Number(c.value) : null, bpm_moy, bpm_max };
+      let vo2max = null;
+      if (vo2.value.trim()) {
+        vo2max = Math.round(Number(vo2.value.trim().replace(",", ".")) * 10) / 10;
+        if (!Number.isFinite(vo2max) || vo2max < 10 || vo2max > 100) throw erreurLisible("La VO2 max doit être un nombre entre 10 et 100 (par exemple 48,5).");
+      }
+      return { forme: c ? Number(c.value) : null, bpm_moy, bpm_max, vo2max };
     },
   };
 }
@@ -1681,64 +1753,114 @@ async function preparerImage(fichier, maximum = 1280) {
 }
 
 // Champ « Ajouter une photo » avec aperçu ; url() envoie la photo et renvoie son adresse
-function champPhoto(prefixe, urlExistante) {
-  let nouvelle = null, retiree = false, apercuUrl = null;
-  const input = el("input", { type: "file", id: prefixe + "-photo", accept: "image/*", class: "visuellement-cache" });
-  const texte = document.createTextNode("Ajouter une photo");
+// Toutes les photos d'une séance (les anciennes séances n'en ont qu'une)
+function photosDe(s) {
+  if (Array.isArray(s.photos) && s.photos.length) return s.photos;
+  return s.photo_url ? [s.photo_url] : [];
+}
+const MAX_PHOTOS = 6;
+
+// Choix de plusieurs photos (jusqu'à 6), avec aperçu et croix pour en retirer une
+function champPhotos(prefixe, existantes = []) {
+  let elements = existantes.map((url) => ({ url, apercu: url })); // { url } déjà en ligne, ou { blob, apercu }
+  const input = el("input", { type: "file", id: prefixe + "-photo", accept: "image/*", multiple: "", class: "visuellement-cache" });
+  const texte = document.createTextNode("Ajouter des photos");
   const bouton = el("label", { class: "bouton-fichier" }, [texte, input]);
-  const apercu = el("div", { class: "apercu-photo" });
-  const retirer = el("button", { type: "button", class: "lien petit" }, "Retirer la photo");
+  const grille = el("div", { class: "apercu-photos" });
+  const info = el("span", { class: "aide" });
   const erreur = el("p", { class: "error", hidden: "" });
 
-  function afficher(src) {
-    apercu.replaceChildren(...(src ? [el("img", { src, alt: "Aperçu de la photo" })] : []));
-    apercu.hidden = !src;
-    retirer.hidden = !src;
-    texte.textContent = src ? "Changer la photo" : "Ajouter une photo";
+  function afficher() {
+    grille.replaceChildren(...elements.map((e, i) => {
+      const retirer = el("button", { type: "button", class: "retirer-photo", "aria-label": "Retirer la photo " + (i + 1) }, "×");
+      retirer.addEventListener("click", () => {
+        if (e.blob) URL.revokeObjectURL(e.apercu);
+        elements.splice(i, 1);
+        afficher();
+      });
+      return el("div", { class: "vignette" }, [el("img", { src: e.apercu, alt: "Photo " + (i + 1) }), retirer]);
+    }));
+    grille.hidden = !elements.length;
+    bouton.hidden = elements.length >= MAX_PHOTOS;
+    texte.textContent = elements.length ? "Ajouter d'autres photos" : "Ajouter des photos";
+    info.textContent = elements.length + " / " + MAX_PHOTOS + " photos";
   }
   input.addEventListener("change", async () => {
-    const fichier = input.files[0];
+    const fichiers = [...input.files].slice(0, MAX_PHOTOS - elements.length);
     input.value = "";
-    if (!fichier) return;
     erreur.hidden = true;
-    try {
-      nouvelle = await preparerImage(fichier);
-      retiree = false;
-      if (apercuUrl) URL.revokeObjectURL(apercuUrl);
-      apercuUrl = URL.createObjectURL(nouvelle);
-      afficher(apercuUrl);
-    } catch (e) {
-      erreur.textContent = messageErreur(e);
-      erreur.hidden = false;
+    for (const f of fichiers) {
+      try {
+        const blob = await preparerImage(f);
+        elements.push({ blob, apercu: URL.createObjectURL(blob) });
+      } catch (e) { erreur.textContent = messageErreur(e); erreur.hidden = false; }
     }
+    afficher();
   });
-  retirer.addEventListener("click", () => { nouvelle = null; retiree = true; afficher(null); });
-  afficher(urlExistante);
+  afficher();
 
   return {
-    bloc: el("div", { class: "field" }, [el("span", { class: "label" }, "Photo (facultatif)"), apercu, el("div", { class: "actions" }, [bouton, retirer]), erreur]),
-    async url(profilId) {
-      if (nouvelle) return donnees.envoyerPhotoSeance(profilId, nouvelle);
-      return retiree ? null : urlExistante || null;
+    bloc: el("div", { class: "field" }, [el("span", { class: "label" }, "Photos (facultatif)"), grille, el("div", { class: "actions" }, [bouton, info]), erreur]),
+    // Envoie les nouvelles photos et renvoie la liste complète des adresses, dans l'ordre
+    async urls(profilId) {
+      const res = [];
+      for (const e of elements) res.push(e.blob ? await donnees.envoyerPhotoSeance(profilId, e.blob) : e.url);
+      return res;
     },
   };
 }
-// Petite vignette ; un clic l'agrandit par-dessus la page
-function photoDeSeance(s, auteur) {
-  if (!s.photo_url) return null;
-  const alt = "Photo de la séance" + (auteur ? " de " + nomComplet(auteur) : "");
-  const b = el("button", { type: "button", class: "photo-seance", "aria-label": "Agrandir la photo" },
-    el("img", { src: s.photo_url, alt, loading: "lazy" }));
-  b.addEventListener("click", () => ouvrirVisionneuse(s.photo_url, alt));
-  return b;
+// Les champs à enregistrer pour les photos
+async function champsDesPhotos(choix, profilId) {
+  const photos = await choix.urls(profilId);
+  return { photos: photos.length ? photos : null, photo_url: photos[0] || null };
 }
-function ouvrirVisionneuse(src, alt) {
-  const fermer = el("button", { type: "button", "aria-label": "Fermer" }, "×");
-  const fond = el("div", { class: "visionneuse", role: "dialog", "aria-label": alt }, [el("img", { src, alt }), fermer]);
+
+// Petites vignettes ; un clic les ouvre en grand, avec des flèches pour passer de l'une à l'autre
+function photoDeSeance(s, auteur) {
+  const liste = photosDe(s);
+  if (!liste.length) return null;
+  const alt = "Photo de la séance" + (auteur ? " " + de(nomComplet(auteur)) : "");
+  return el("div", { class: "galerie" }, liste.map((src, i) => {
+    const b = el("button", { type: "button", class: "photo-seance", "aria-label": "Agrandir la photo " + (i + 1) + " sur " + liste.length },
+      el("img", { src, alt: alt + " (" + (i + 1) + ")", loading: "lazy" }));
+    b.addEventListener("click", () => ouvrirVisionneuse(liste, i, alt));
+    return b;
+  }));
+}
+function ouvrirVisionneuse(liste, depart = 0, alt = "Photo") {
+  if (typeof liste === "string") liste = [liste];
+  let i = depart;
+  const img = el("img", { alt });
+  const compteur = el("span", { class: "compteur" });
+  const fermer = el("button", { type: "button", class: "v-fermer", "aria-label": "Fermer" }, "×");
+  const prec = el("button", { type: "button", class: "v-fleche v-prec", "aria-label": "Photo précédente" }, "‹");
+  const suiv = el("button", { type: "button", class: "v-fleche v-suiv", "aria-label": "Photo suivante" }, "›");
+  const plusieurs = liste.length > 1;
+  prec.hidden = suiv.hidden = compteur.hidden = !plusieurs;
+  const montrerPhoto = () => { img.src = liste[i]; compteur.textContent = (i + 1) + " / " + liste.length; };
+  const aller = (pas) => { i = (i + pas + liste.length) % liste.length; montrerPhoto(); };
+  const fond = el("div", { class: "visionneuse", role: "dialog", "aria-label": alt }, [img, prec, suiv, compteur, fermer]);
   const quitter = () => { fond.remove(); document.removeEventListener("keydown", touche); };
-  const touche = (e) => { if (e.key === "Escape") quitter(); };
-  fond.addEventListener("click", quitter);
+  const touche = (e) => {
+    if (e.key === "Escape") quitter();
+    if (plusieurs && e.key === "ArrowLeft") aller(-1);
+    if (plusieurs && e.key === "ArrowRight") aller(1);
+  };
+  prec.addEventListener("click", (e) => { e.stopPropagation(); aller(-1); });
+  suiv.addEventListener("click", (e) => { e.stopPropagation(); aller(1); });
+  // Glisser le doigt vers la gauche ou la droite
+  let xDepart = null;
+  fond.addEventListener("touchstart", (e) => { xDepart = e.touches[0].clientX; }, { passive: true });
+  fond.addEventListener("touchend", (e) => {
+    if (xDepart === null || !plusieurs) return;
+    const dx = e.changedTouches[0].clientX - xDepart;
+    if (Math.abs(dx) > 40) aller(dx < 0 ? 1 : -1);
+    xDepart = null;
+  });
+  fond.addEventListener("click", (e) => { if (e.target === fond || e.target === fermer) quitter(); });
+  img.addEventListener("click", (e) => { e.stopPropagation(); if (plusieurs) aller(1); else quitter(); });
   document.addEventListener("keydown", touche);
+  montrerPhoto();
   document.body.append(fond);
   fermer.focus();
 }
@@ -1854,12 +1976,15 @@ async function majPastilles() {
   const qui = moi.id;
   const verifs = [["fil", donnees.nbNouveauxPosts], ["semaine", donnees.nbNouvellesSeances]];
   for (const [o, compter] of verifs) {
-    if (onglet === o) continue; // l'onglet ouvert est déjà « vu »
+    const ouvert = onglet === o;
+    if (ouvert && o !== "fil") continue; // l'onglet ouvert est déjà « vu »
     let depuis = lire(cleVu(o));
     if (!depuis) { depuis = new Date().toISOString(); ecrire(cleVu(o), depuis); } // première visite sur cet appareil
     try {
-      const n = await compter(qui, depuis);
-      if (moi && moi.id === qui && onglet !== o) poserPastille(o, n);
+      // Fil : les séances à valider restent signalées tant qu'on ne les a pas traitées
+      const aValider = o === "fil" ? await donnees.nbPropositions(qui).catch(() => 0) : 0;
+      const n = (ouvert ? 0 : await compter(qui, depuis)) + aValider;
+      if (moi && moi.id === qui) poserPastille(o, n);
     } catch (e) { /* pas grave : on réessaiera plus tard */ }
   }
 }
@@ -1897,6 +2022,14 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "1.9", nom: "Photos, GIF et cœurs qui chavirent", date: "31 octobre 2026", nouveautes: [
+    "Plusieurs photos par séance (jusqu'à 6), à faire défiler en grand.",
+    "Des GIF dans les commentaires : depuis son téléphone ou avec un lien Giphy.",
+    "« Avec qui ? » : les personnes avec qui on a couru reçoivent la séance en haut de leur fil, et la valident ou la corrigent avant qu'elle compte pour elles.",
+    "La VO2 max peut s'ajouter à chaque séance.",
+    "Quatre nouveaux trophées : le plus reposé, l'instagrammeuse, fait chavirer les cœurs et la plus belle évolution de VO2 max.",
+    "Une petite ligne avec la date sépare les jours dans le fil.",
+  ] },
   { num: "1.8", nom: "Le grand calendrier", date: "31 octobre 2026", nouveautes: [
     "Un calendrier dans le profil de chacun : on voit les séances faites et prévues, jour par jour.",
     "Bilan d'une période : 7, 14, 21 ou 28 jours, ou les jours de son choix sur le calendrier (séances, km, temps, allure, forme, BPM, types de séance…).",
@@ -2195,6 +2328,74 @@ function carteFil(s) {
   return carte;
 }
 
+/* ---------- GIF dans les commentaires ----------
+   Deux façons : choisir un GIF (ou une image) sur son téléphone, ou coller un lien (Giphy, Tenor…). */
+function gifCommentaire(src) {
+  const img = el("img", { class: "com-gif", src, alt: "GIF", loading: "lazy" });
+  img.addEventListener("click", () => ouvrirVisionneuse(src, 0, "GIF"));
+  return img;
+}
+// Transforme un lien de page Giphy en lien direct vers le GIF
+function lienGifDirect(texte) {
+  let u;
+  try { u = new URL(texte.trim()); } catch (e) { return null; }
+  if (u.protocol !== "https:") return null;
+  const giphy = u.hostname.endsWith("giphy.com") && u.pathname.match(/(?:gifs|media|stickers)\/(?:[^/]*-)?([A-Za-z0-9]+)(?:\/|$)/);
+  if (giphy && !/\.(gif|webp)$/i.test(u.pathname)) return "https://media.giphy.com/media/" + giphy[1] + "/giphy.gif";
+  if (/\.(gif|webp|png|jpe?g)$/i.test(u.pathname) || u.hostname.startsWith("media.tenor.com") || u.hostname.startsWith("media") && u.hostname.endsWith("giphy.com")) return u.href;
+  return null;
+}
+function panneauGif(prefixe, signaler) {
+  let fichier = null, lien = null, apercuUrl = null;
+  const input = el("input", { type: "file", id: prefixe + "-fichier", accept: "image/gif,image/*", class: "visuellement-cache" });
+  const choisir = el("label", { class: "bouton-fichier compact-fichier" }, ["Choisir sur mon téléphone", input]);
+  const champLien = el("input", { type: "url", id: prefixe + "-lien", placeholder: "ou colle un lien de GIF (Giphy…)", autocomplete: "off", "aria-label": "Lien d'un GIF" });
+  const apercu = el("div", { class: "gif-apercu", hidden: "" });
+  const retirer = el("button", { type: "button", class: "lien petit" }, "Retirer le GIF");
+  retirer.addEventListener("click", vider);
+  function montrer(src) {
+    apercu.replaceChildren(el("img", { src, alt: "Aperçu du GIF" }), retirer);
+    apercu.hidden = false;
+  }
+  input.addEventListener("change", () => {
+    const f = input.files[0];
+    input.value = "";
+    if (!f) return;
+    if (f.size > 6 * 1024 * 1024) { signaler("Ce GIF est trop lourd (6 Mo maximum)."); return; }
+    signaler("");
+    fichier = f; lien = null; champLien.value = "";
+    if (apercuUrl) URL.revokeObjectURL(apercuUrl);
+    apercuUrl = URL.createObjectURL(f);
+    montrer(apercuUrl);
+  });
+  champLien.addEventListener("input", () => {
+    const t = champLien.value.trim();
+    if (!t) { lien = null; if (!fichier) apercu.hidden = true; signaler(""); return; }
+    const direct = lienGifDirect(t);
+    if (!direct) { lien = null; signaler("Ce lien ne mène pas directement à un GIF. Sur Giphy, copie le lien du GIF ; sinon, un lien qui finit par .gif."); return; }
+    signaler("");
+    lien = direct; fichier = null;
+    montrer(direct);
+  });
+  function vider() {
+    fichier = null; lien = null; champLien.value = "";
+    if (apercuUrl) { URL.revokeObjectURL(apercuUrl); apercuUrl = null; }
+    apercu.hidden = true; apercu.replaceChildren();
+  }
+  return {
+    bloc: el("div", { class: "panneau-gif", hidden: "" }, [el("div", { class: "actions" }, [choisir]), champLien, apercu]),
+    aUnGif: () => !!(fichier || lien),
+    vider,
+    async url(profilId) {
+      if (lien) return lien;
+      if (!fichier) return null;
+      // Un GIF garde son animation : on l'envoie tel quel ; une photo est d'abord réduite
+      if (fichier.type === "image/gif") return donnees.envoyerGif(profilId, fichier, "gif");
+      return donnees.envoyerGif(profilId, await preparerImage(fichier, 800), "jpg");
+    },
+  };
+}
+
 // Réactions sous un post : 👏 🔥 💪, un clic pour ajouter ou retirer la sienne
 const REACTIONS = { bravo: { emoji: "👏", nom: "Bravo" }, feu: { emoji: "🔥", nom: "En feu" }, muscle: { emoji: "💪", nom: "Costaud" } };
 function zoneReactions(s) {
@@ -2275,7 +2476,8 @@ function zoneCommentaires(s) {
     return el("div", { class: "com" }, [
       lienPersonne(c.auteur, avatarEl(c.auteur, "mini"), "personne avatar-lien"),
       el("div", { class: "com-corps" }, [
-        el("p", { class: "com-texte" }, [lienPersonne(c.auteur, el("b", {}, nomComplet(c.auteur))), " ", c.texte]),
+        el("p", { class: "com-texte" }, [lienPersonne(c.auteur, el("b", {}, nomComplet(c.auteur))), c.texte ? " " + c.texte : ""]),
+        c.gif_url ? gifCommentaire(c.gif_url) : null,
         meta,
       ]),
     ]);
@@ -2292,18 +2494,27 @@ function zoneCommentaires(s) {
   }
 
   const champ = el("input", { type: "text", id: "com-input-" + s.id, maxlength: "500", placeholder: "Ajouter un commentaire…", "aria-label": "Ajouter un commentaire", autocomplete: "off" });
+  const boutonGif = el("button", { type: "button", class: "ghost bouton-gif", "aria-expanded": "false", "aria-label": "Ajouter un GIF" }, "GIF");
   const envoyer = el("button", { type: "submit" }, "Envoyer");
   const erreur = el("p", { class: "error", hidden: "" });
-  const form = el("form", { class: "com-form", novalidate: "" }, [champ, envoyer]);
+  const gif = panneauGif("gif-" + s.id, (msg) => { erreur.textContent = msg; erreur.hidden = !msg; });
+  boutonGif.addEventListener("click", () => {
+    gif.bloc.hidden = !gif.bloc.hidden;
+    boutonGif.setAttribute("aria-expanded", String(!gif.bloc.hidden));
+  });
+  const form = el("form", { class: "com-form", novalidate: "" }, [champ, boutonGif, envoyer]);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const texte = champ.value.trim();
-    if (!texte || !moi) return;
+    if ((!texte && !gif.aUnGif()) || !moi) return;
     erreur.hidden = true;
     try {
-      const c = await pendant(envoyer, "…", () => donnees.commenter(s.id, moi.id, texte));
+      const c = await pendant(envoyer, "…", async () => donnees.commenter(s.id, moi.id, texte, await gif.url(moi.id)));
       coms.push(c);
       champ.value = "";
+      gif.vider();
+      gif.bloc.hidden = true;
+      boutonGif.setAttribute("aria-expanded", "false");
       rendre();
     } catch (e) {
       erreur.textContent = messageErreur(e);
@@ -2312,12 +2523,75 @@ function zoneCommentaires(s) {
   });
 
   rendre();
-  return el("div", { class: "commentaires" }, [liste, form, erreur]);
+  return el("div", { class: "commentaires" }, [liste, form, gif.bloc, erreur]);
 }
+
+/* ---------- Séances proposées : quelqu'un a couru avec moi ---------- */
+async function afficherPropositions() {
+  const zone = $("propositions");
+  if (!moi) return;
+  let liste;
+  try { liste = await donnees.propositions(moi.id); } catch (e) { zone.hidden = true; return; }
+  zone.hidden = !liste.length;
+  if (!liste.length) { zone.replaceChildren(); return; }
+  zone.replaceChildren(
+    el("h3", {}, liste.length > 1 ? liste.length + " séances à valider" : "Une séance à valider"),
+    ...liste.map(cartePropose),
+  );
+}
+
+function cartePropose(s) {
+  const qui = s.par || { prenom: "Quelqu'un" };
+  const erreur = el("p", { class: "error", hidden: "" });
+  const valider = el("button", { type: "button" }, "Valider telle quelle");
+  const modifier = el("button", { type: "button", class: "ghost" }, "Modifier puis valider");
+  const ignorer = el("button", { type: "button", class: "lien petit" }, "Je n'y étais pas");
+  const carte = el("article", { class: "seance proposee" }, [
+    el("div", { class: "post-tete" }, [
+      avatarEl(qui, "petit"),
+      el("div", { class: "post-qui" }, [el("b", {}, nomComplet(qui) + " a couru avec toi"), el("div", { class: "muted petit" }, "Ajoute cette séance à la tienne, ou corrige-la d'abord (une répétition de plus, tes BPM…).")]),
+    ]),
+    enTeteSeance(s),
+    s.titre ? el("p", { class: "seance-titre" }, s.titre) : null,
+    s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : null,
+    etatEffort(s),
+    el("div", { class: "actions" }, [valider, modifier, ignorer]),
+    erreur,
+  ]);
+  carte.style.setProperty("--auteur", couleurDe(qui));
+  valider.addEventListener("click", async () => {
+    try {
+      await pendant(valider, "Validation…", () => donnees.majSeance(s.id, { fait: true, fait_le: new Date().toISOString() }));
+      afficherPropositions();
+      majPastilles();
+    } catch (e) { erreur.textContent = messageErreur(e); erreur.hidden = false; }
+  });
+  modifier.addEventListener("click", () => ouvrirPublier(s));
+  ignorer.addEventListener("click", async () => {
+    try {
+      await pendant(ignorer, "…", () => donnees.supprimerSeance(s.id));
+      afficherPropositions();
+      majPastilles();
+    } catch (e) { erreur.textContent = messageErreur(e); erreur.hidden = false; }
+  });
+  return carte;
+}
+
+// « Aujourd'hui », « Hier », ou « Jeudi 29 octobre »
+function libelleJour(iso) {
+  const auj = aujourdhui();
+  if (iso === auj) return "Aujourd'hui";
+  if (iso === decalerIso(auj, -1)) return "Hier";
+  const t = formatDate(iso);
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+let dernierJourFil = null;
 
 async function chargerFil(depuisLeDebut) {
   const liste = $("fil-liste");
   if (depuisLeDebut) {
+    afficherPropositions();
+    dernierJourFil = null;
     pageFil = 0;
     liste.replaceChildren(el("p", { class: "muted" }, "Chargement du fil…"));
   }
@@ -2328,7 +2602,15 @@ async function chargerFil(depuisLeDebut) {
     if (depuisLeDebut && posts.length === 0) {
       liste.append(el("p", { class: "vide" }, "Rien pour l'instant. Dès qu'une séance sera cochée comme faite ou publiée, elle apparaîtra ici."));
     }
-    posts.forEach((s) => liste.append(carteFil(s)));
+    posts.forEach((s) => {
+      // Une petite ligne avec la date dès qu'on change de jour
+      const jour = isoLocal(new Date(s.fait_le));
+      if (jour !== dernierJourFil) {
+        liste.append(el("div", { class: "separateur-date", role: "heading", "aria-level": "3" }, el("span", {}, libelleJour(jour))));
+        dernierJourFil = jour;
+      }
+      liste.append(carteFil(s));
+    });
     $("fil-plus").hidden = posts.length < PAR_PAGE;
     pageFil++;
   } catch (e) {
@@ -2351,8 +2633,9 @@ function ouvrirPublier(existante = null) {
   pubEnModif = existante;
   const s = existante || {};
   $("form-publier").reset();
-  $("pub-titre-form").textContent = existante ? "Modifier ma séance" : "Une séance faite de ton côté";
-  $("bouton-publier").textContent = existante ? "Enregistrer" : "Publier";
+  const proposee = existante && !existante.fait;
+  $("pub-titre-form").textContent = proposee ? "Ta séance avec " + nomComplet(existante.par) : existante ? "Modifier ma séance" : "Une séance faite de ton côté";
+  $("bouton-publier").textContent = proposee ? "Valider ma séance" : existante ? "Enregistrer" : "Publier";
   $("pub-date").value = existante ? (existante.date || "") : aujourdhui();
   $("pub-commentaire").value = s.commentaire || "";
   effortPublier = champsEffort("pub", s);
@@ -2380,7 +2663,7 @@ function ouvrirPublier(existante = null) {
   choixAvec = choixPersonnes("avec", autres);
   $("pub-avec").replaceChildren(autres.length ? choixAvec.bloc : el("p", { class: "muted petit" }, "Personne d'autre n'est encore inscrit."));
   ressentiPublier = choixRessenti("pub-rpe", s.ressenti || null);
-  photoPublier = champPhoto("pub-image", s.photo_url || null);
+  photoPublier = champPhotos("pub-image", photosDe(s));
   $("pub-photo").replaceChildren(photoPublier.bloc);
   $("pub-ressenti").replaceChildren(ressentiPublier);
   afficherMessage("erreur-publier", "");
@@ -2408,13 +2691,16 @@ $("form-publier").addEventListener("submit", async (event) => {
           ...commun,
           ressenti: ressentiPublier.valeur(), commentaire: $("pub-commentaire").value.trim() || null,
           ...forme, reps_bpm,
-          photo_url: await photoPublier.url(moi.id),
+          ...(await champsDesPhotos(photoPublier, moi.id)),
+          // Une séance qu'on me proposait devient la mienne une fois validée
+          ...(enModif.fait ? {} : { fait: true, fait_le: new Date().toISOString() }),
         });
-        // Les personnes avec qui j'ai couru voient aussi la séance corrigée
-        if (enModif.groupe_id) await donnees.majCompagnons(enModif.groupe_id, commun);
+        // Les personnes avec qui j'ai couru (et qui n'ont pas encore validé) voient la séance corrigée
+        if (enModif.groupe_id && enModif.principal !== false) await donnees.majCompagnons(enModif.groupe_id, commun);
       });
       fermerPublier();
       chargerFil(true);
+      majPastilles();
       return;
     }
     const avec = choixAvec ? choixAvec.valeurs() : [];
@@ -2428,14 +2714,14 @@ $("form-publier").addEventListener("submit", async (event) => {
         ...commun, athlete_id: moi.id,
         ressenti: ressentiPublier.valeur(), commentaire: $("pub-commentaire").value.trim() || null,
         ...forme, reps_bpm,
-        photo_url: await photoPublier.url(moi.id),
+        ...(await champsDesPhotos(photoPublier, moi.id)),
       };
       if (!avec.length) return donnees.envoyerSeance(principale);
-      // … et la même séance pour chaque personne avec qui j'ai couru, reliées par un même groupe
+      // … et une séance PROPOSÉE à chaque personne avec qui j'ai couru : elle la valide (ou la corrige) de son côté
       const groupe_id = nouvelUuid();
       return donnees.envoyerSeance([
         { ...principale, groupe_id, principal: true },
-        ...avec.map((id) => ({ ...commun, athlete_id: id, groupe_id, principal: false })),
+        ...avec.map((id) => ({ ...commun, athlete_id: id, groupe_id, principal: false, fait: false, fait_le: null })),
       ]);
     });
     fermerPublier();
@@ -2536,7 +2822,7 @@ function carteSemaine(s, surChangement = () => {}) {
     const decocher = el("button", { type: "button", class: "lien petit" }, "Marquer comme non faite");
     decocher.addEventListener("click", async () => {
       const maj = { fait: false, fait_le: null, ressenti: null, commentaire: null, distance_km: null, duree_min: null, duree_s: null,
-        forme: null, bpm_moy: null, bpm_max: null, reps_bpm: null, photo_url: null };
+        forme: null, bpm_moy: null, bpm_max: null, reps_bpm: null, vo2max: null, photos: null, photo_url: null };
       try { await pendant(decocher, "…", () => donnees.majSeance(s.id, maj)); Object.assign(s, maj); afficherEtat(); majProgression(); majObjectifsSemaine(); surChangement("decochee"); }
       catch (e) { zone.append(el("p", { class: "error" }, messageErreur(e))); }
     });
@@ -2576,7 +2862,7 @@ function carteSemaine(s, surChangement = () => {}) {
     const forme = champsForme("forme-" + s.id, s);
     const nb = nbRepsDe(s);
     const reps = nb ? champsReps("reps-" + s.id, nb, s.reps_bpm) : null;
-    const photo = champPhoto("seance-" + s.id, s.photo_url);
+    const photo = champPhotos("seance-" + s.id, photosDe(s));
     const idCom = "com-" + s.id;
     const com = el("textarea", { id: idCom, placeholder: "Comment ça s'est passé ? Sensations, chronos, douleurs…" });
     com.value = s.commentaire || "";
@@ -2596,7 +2882,7 @@ function carteSemaine(s, surChangement = () => {}) {
           reps_bpm: reps ? reps.lire() : null,
         };
         await pendant(valider, "Enregistrement…", async () => {
-          maj.photo_url = await photo.url(moi.id);
+          Object.assign(maj, await champsDesPhotos(photo, moi.id));
           await donnees.majSeance(s.id, maj);
         });
         Object.assign(s, maj);
@@ -2781,7 +3067,10 @@ function calendrier(personne, { interactif = false, seances: donneesInitiales = 
 
     const auj = aujourdhui();
     const parJour = {};
-    seances.forEach((x) => { const j = jourCalendrier(x); if (j) (parJour[j] ||= []).push(x); });
+    seances.forEach((x) => {
+      if (x.principal === false && !x.fait) return; // séance proposée, pas encore validée
+      const j = jourCalendrier(x); if (j) (parJour[j] ||= []).push(x);
+    });
     const debut = lundiDe(premier);
     const dernier = new Date(premier.getFullYear(), premier.getMonth() + 1, 0);
     const fin = lundiDe(dernier); fin.setDate(fin.getDate() + 6);
@@ -2869,7 +3158,7 @@ function carteLecture(x, estMoi) {
     x.fait ? photoDeSeance(x) : null,
     x.fait && x.commentaire ? el("blockquote", { class: "commentaire" }, x.commentaire) : null,
   ]);
-  if (estMoi && !x.coach_id && x.principal !== false) {
+  if (estMoi && !x.coach_id && x.fait) {
     const modifier = el("button", { type: "button", class: "lien petit", style: "justify-self:start" }, "Modifier ma séance");
     modifier.addEventListener("click", () => { aller("fil"); ouvrirPublier(x); });
     carte.append(modifier);
@@ -3156,8 +3445,44 @@ function statsPersonne(seances) {
     maxSemaineKm: Math.max(0, ...Object.values(parSemaine).map((x) => x.km)),
     rpeMoyen: rpeNb ? rpeTotal / rpeNb : null,
     serieActuelle, meilleureSerie, progressionTotale,
+    ...statsBonus(seances, cleCourante),
     progressionSemaine: wPrec.km > 0 && w.km > wPrec.km ? ((w.km - wPrec.km) / wPrec.km) * 100 : null,
     coms: { tout: 0, semaine: 0 },
+  };
+}
+
+// Pour les trophées : repos, photos, BPM le plus haut, évolution de la VO2 max
+function bpmMaxDe(s) {
+  const reps = Array.isArray(s.reps_bpm) ? s.reps_bpm.filter(Boolean).map((r) => r.max || 0) : [];
+  return Math.max(s.bpm_max || 0, ...reps, 0);
+}
+function statsBonus(seances, cleCourante) {
+  const auj = aujourdhui();
+  const jours = [...new Set(seances.map((s) => isoLocal(jourDeSeance(s))))].sort();
+  // Le plus long repos depuis toujours : entre deux séances, ou depuis la dernière jusqu'à aujourd'hui
+  let reposMax = 0;
+  for (let i = 1; i < jours.length; i++) reposMax = Math.max(reposMax, nbJoursEntre(jours[i - 1], jours[i]) - 2);
+  if (jours.length) reposMax = Math.max(reposMax, nbJoursEntre(jours[jours.length - 1], auj) - 1);
+  // Cette semaine : la plus longue suite de jours sans séance, de lundi à aujourd'hui
+  let reposSemaine = 0, suite = 0;
+  for (let d = cleCourante; d <= auj; d = decalerIso(d, 1)) {
+    suite = jours.includes(d) ? 0 : suite + 1;
+    reposSemaine = Math.max(reposSemaine, suite);
+  }
+  const cetteSemaine = (s) => cleSemaine(jourDeSeance(s)) === cleCourante;
+  // VO2 max : mesures dans l'ordre des jours
+  const mesures = seances.filter((s) => s.vo2max).map((s) => ({ jour: isoLocal(jourDeSeance(s)), v: Number(s.vo2max) }))
+    .sort((a, b) => a.jour.localeCompare(b.jour));
+  const avant = mesures.filter((m) => m.jour < cleCourante), pendant = mesures.filter((m) => m.jour >= cleCourante);
+  return {
+    reposMax: jours.length ? reposMax : 0,
+    reposSemaine: jours.length ? reposSemaine : 0,
+    photos: seances.reduce((t, s) => t + photosDe(s).length, 0),
+    photosSemaine: seances.filter(cetteSemaine).reduce((t, s) => t + photosDe(s).length, 0),
+    bpmMax: Math.max(0, ...seances.map(bpmMaxDe)),
+    bpmMaxSemaine: Math.max(0, ...seances.filter(cetteSemaine).map(bpmMaxDe)),
+    vo2Evolution: mesures.length >= 2 ? Math.round((mesures[mesures.length - 1].v - mesures[0].v) * 10) / 10 : null,
+    vo2Semaine: avant.length && pendant.length ? Math.round((pendant[pendant.length - 1].v - avant[avant.length - 1].v) * 10) / 10 : null,
   };
 }
 
@@ -3203,6 +3528,19 @@ const TROPHEES = [
     semaine: (st) => st.w.types.size, toujours: (st) => st.types, format: (n) => pluriel(n, "type") },
   { nom: "Le meilleur supporter", desc: "Le plus de commentaires laissés aux autres",
     semaine: (st) => st.coms.semaine, toujours: (st) => st.coms.tout, format: (n) => pluriel(n, "commentaire") },
+  { nom: "Le plus reposé",
+    desc: { semaine: "La plus longue pause sans séance cette semaine",
+            toujours: "La plus longue pause entre deux séances (ou depuis la dernière)" },
+    semaine: (st) => st.reposSemaine, toujours: (st) => st.reposMax, format: (n) => pluriel(n, "jour") + " de repos" },
+  { nom: "L'instagrammeuse", desc: "Le plus de photos publiées avec ses séances",
+    semaine: (st) => st.photosSemaine, toujours: (st) => st.photos, format: (n) => pluriel(n, "photo") },
+  { nom: "Fait chavirer les cœurs", desc: "Le BPM le plus haut enregistré",
+    semaine: (st) => st.bpmMaxSemaine, toujours: (st) => st.bpmMax, format: (n) => n + " bpm" },
+  { nom: "La plus belle évolution de VO2 max",
+    desc: { semaine: "VO2 max gagnée par rapport à la dernière mesure d'avant cette semaine",
+            toujours: "VO2 max gagnée depuis la toute première mesure" },
+    semaine: (st) => st.vo2Semaine, toujours: (st) => st.vo2Evolution,
+    format: (n) => "+" + n.toLocaleString("fr-FR") },
 ];
 
 // Les 3 premiers d'un trophée (seulement ceux qui ont une valeur positive)
