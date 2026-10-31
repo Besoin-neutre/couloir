@@ -1282,7 +1282,7 @@ function messageErreur(e) {
   if (e && e.lisible) return e.message;
   const m = (e && (e.message || e.error_description)) || String(e);
   if (/Failed to fetch|NetworkError|Load failed/i.test(m)) return "Impossible de joindre le serveur. Vérifie ta connexion Internet.";
-  if (/row-level security|permission denied|Unauthorized/i.test(m)) return "Action refusée par les règles de la base de données.";
+  if (/row-level security|permission denied|Unauthorized/i.test(m)) return "Action refusée par les règles de la base de données. (Détail pour Claude : " + m + ")";
   if (/column .* does not exist|Could not find/i.test(m)) return "La base de données n'est pas à jour : lance le dernier code SQL dans Supabase.";
   if (/duplicate key|profils_couleur_unique/i.test(m)) return "Cette couleur vient d'être prise par quelqu'un d'autre. Choisis-en une autre.";
   if (/Bucket not found/i.test(m)) return "Le dossier des photos n'existe pas encore : lance le dernier code SQL dans Supabase.";
