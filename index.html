@@ -400,6 +400,30 @@ button.cocher:hover .case { background: var(--ok); }
 .cal-legende span { display: inline-flex; align-items: center; gap: 6px; }
 .confirmation { margin: 0; font-weight: 600; }
 
+/* Durée en h / min / s */
+.champ-temps { grid-column: 1 / -1; }
+.temps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.temps input { width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
+.temps input.t-min { width: 76px; font-weight: 600; }
+.temps span { color: var(--muted); font-size: 15px; margin-right: 4px; }
+.saisie-effort { grid-template-columns: 1fr; }
+
+/* Forme du jour (1 à 5) */
+.forme-ligne { grid-template-columns: repeat(5, 1fr); }
+.rpe-ligne input:checked + label.forme { background: var(--track); border-color: var(--track); color: var(--surface); }
+
+/* BPM de chaque répétition */
+.reps-bloc { display: grid; gap: 8px; }
+.reps { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr); gap: 6px 10px; align-items: center; }
+.reps .rep-nom { font-weight: 600; font-size: 15px; white-space: nowrap; }
+.reps input { text-align: center; }
+.effort { display: grid; gap: 8px; }
+.reps-table { border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; min-width: 240px; }
+.reps-table th, .reps-table td { padding: 4px 10px; border-bottom: 1px solid var(--line); text-align: center; }
+.reps-table th:first-child, .reps-table td:first-child { text-align: left; padding-left: 0; }
+.reps-table th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.chip.coeur { border-color: color-mix(in srgb, var(--erreur) 45%, var(--line)); }
+
 /* Prénoms cliquables */
 button.personne { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-align: left; border-radius: 4px; }
 button.personne:hover b, button.personne:focus-visible b { text-decoration: underline; text-underline-offset: 3px; }
@@ -591,17 +615,10 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
           <div id="pub-avec"></div>
           <p class="aide">La séance comptera aussi dans leurs statistiques et leurs trophées. Elle n'apparaîtra qu'une fois dans le fil.</p>
         </fieldset>
-        <div class="saisie-effort">
-          <div class="field">
-            <label for="pub-distance">Distance (km)</label>
-            <input id="pub-distance" type="text" inputmode="decimal" placeholder="8,5">
-          </div>
-          <div class="field">
-            <label for="pub-duree">Durée (min)</label>
-            <input id="pub-duree" type="text" inputmode="numeric" placeholder="45">
-          </div>
-        </div>
+        <div id="pub-effort"></div>
+        <div id="pub-reps"></div>
         <div id="pub-ressenti"></div>
+        <div id="pub-forme"></div>
         <div class="field">
           <label for="pub-commentaire">Ton ressenti</label>
           <textarea id="pub-commentaire" placeholder="Bonnes sensations, jambes un peu lourdes au début…"></textarea>
@@ -684,35 +701,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
             <input id="seance-date" type="date">
           </div>
 
-          <fieldset>
-            <legend class="label">Type de séance</legend>
-            <div class="types" id="types"></div>
-          </fieldset>
-
-          <!-- Champs propres au type choisi (durée, répétitions…) -->
-          <div class="champs" id="champs-modele"></div>
-          <label class="option" id="option-echauffement">
-            <input type="checkbox" id="echauffement" checked>
-            Ajouter l'échauffement et le retour au calme
-          </label>
-
-          <!-- Pour une séance libre : titre et contenu écrits à la main -->
-          <div class="groupe-libre" id="champs-libre" hidden>
-            <div class="field">
-              <label for="seance-titre">Titre</label>
-              <input id="seance-titre" placeholder="Séance technique de haies">
-            </div>
-            <div class="field">
-              <label for="seance-contenu">Contenu de la séance</label>
-              <textarea id="seance-contenu" class="grand" placeholder="Échauffement : 20 min footing + gammes&#10;Corps de séance : …&#10;Retour au calme : 10 min footing + étirements"></textarea>
-            </div>
-          </div>
-
-          <div class="apercu" id="apercu">
-            <span class="label">Aperçu pour l'athlète</span>
-            <p class="seance-titre" id="apercu-titre"></p>
-            <p class="seance-contenu" id="apercu-contenu"></p>
-          </div>
+          <div id="planif-modele"></div>
 
           <div class="field">
             <label for="seance-consignes">Consignes ou commentaire (facultatif)</label>
@@ -905,7 +894,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
 function verifier({ data, error }) { if (error) throw error; return data; }
 
 const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url, couleur, objectif_km, objectif_seances, records";
-const CHAMPS_SEANCE = "id, cree_le, date, type, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
+const CHAMPS_SEANCE = "id, cree_le, date, type, parametres, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, duree_s, forme, bpm_moy, bpm_max, reps_bpm, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
 const CHAMPS_COMMENTAIRE = "id, texte, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url, couleur)";
 const CHAMPS_FIL = CHAMPS_SEANCE
   + ", reactions(auteur_id, emoji)"
@@ -942,7 +931,7 @@ const donnees = {
       .eq("athlete_id", id).order("date", { ascending: true }).limit(2000));
   },
   async seancesFaitesDe(id) {
-    return verifier(await sb.from("seances").select("id, date, fait_le, type, ressenti, distance_km, duree_min")
+    return verifier(await sb.from("seances").select("id, date, fait_le, type, ressenti, distance_km, duree_min, duree_s")
       .eq("athlete_id", id).eq("fait", true));
   },
   async nbSeancesFaites(id) {
@@ -1024,7 +1013,7 @@ const donnees = {
   // Pour les statistiques et les trophées : toutes les séances faites et tous les commentaires
   async seancesFaites() {
     return toutLire(() => sb.from("seances")
-      .select("id, athlete_id, date, fait_le, type, ressenti, distance_km, duree_min")
+      .select("id, athlete_id, date, fait_le, type, ressenti, distance_km, duree_min, duree_s")
       .eq("fait", true).order("id"));
   },
   async tousLesCommentaires() {
@@ -1211,36 +1200,73 @@ function choixRessenti(prefixe, valeur) {
   return fs;
 }
 
-/* ---------- Modèles de séance pour le coach ---------- */
-// « 75 » devient « 1 h 15 », « 45 » devient « 45 min »
-function enMinutes(min) {
-  if (min < 60) return min + " min";
-  const h = Math.floor(min / 60), m = min % 60;
-  return h + " h" + (m ? " " + String(m).padStart(2, "0") : "");
+/* ---------- Durées : tout est compté en secondes ---------- */
+// 2700 → « 45 min », 4500 → « 1 h 15 », 90 → « 1 min 30 », 30 → « 30 s », 3725 → « 1 h 02 min 05 s »
+function enDuree(sec) {
+  sec = Math.round(sec || 0);
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  const p = (n) => String(n).padStart(2, "0");
+  if (h) return h + " h" + (s ? " " + p(m) + " min " + p(s) + " s" : m ? " " + p(m) : "");
+  if (m) return m + " min" + (s ? " " + p(s) : "");
+  return s + " s";
 }
-// « 90 » devient « 1 min 30 », « 45 » devient « 45 s »
-function enSecondes(s) {
-  if (s < 60) return s + " s";
-  const m = Math.floor(s / 60), r = s % 60;
-  return m + " min" + (r ? " " + String(r).padStart(2, "0") : "");
+function enMinutes(min) { return enDuree(Math.round((min || 0) * 60)); }
+// Durée d'une séance en secondes (les anciennes séances n'ont que des minutes)
+function dureeSec(s) {
+  if (s.duree_s != null) return s.duree_s;
+  return s.duree_min != null ? s.duree_min * 60 : null;
 }
+
+// Champ de durée en trois cases : h / min / s (la case « min » est la principale)
+function champTemps(id, label, secondes, surSaisie = () => {}) {
+  const caseTemps = (suffixe, nom, classe) => el("input", {
+    id: suffixe ? id + "-" + suffixe : id, type: "text", inputmode: "numeric", autocomplete: "off",
+    class: "t-" + classe, "aria-label": label + " (" + nom + ")",
+  });
+  const h = caseTemps("h", "heures", "h"), m = caseTemps("", "minutes", "min"), sc = caseTemps("s", "secondes", "s");
+  function poser(v) {
+    if (v == null || Number.isNaN(v)) { h.value = m.value = sc.value = ""; return; }
+    const H = Math.floor(v / 3600), M = Math.floor((v % 3600) / 60), S = Math.round(v % 60);
+    h.value = H ? String(H) : "";
+    m.value = M ? String(M) : (!H && !S ? "0" : "");
+    sc.value = S ? String(S) : "";
+  }
+  function valeur() {
+    const parts = [h, m, sc].map((i) => i.value.trim());
+    if (parts.every((x) => x === "")) return null;
+    const n = parts.map((x) => (x === "" ? 0 : Number(x.replace(",", "."))));
+    if (n.some((x) => !Number.isFinite(x) || x < 0)) return NaN;
+    return Math.round(n[0] * 3600 + n[1] * 60 + n[2]);
+  }
+  [h, m, sc].forEach((i) => i.addEventListener("input", () => surSaisie(valeur())));
+  poser(secondes);
+  const bloc = el("div", { class: "field champ-temps" }, [
+    el("label", { for: id }, label),
+    el("div", { class: "temps" }, [h, el("span", {}, "h"), m, el("span", {}, "min"), sc, el("span", {}, "s")]),
+  ]);
+  return { bloc, valeur, poser };
+}
+
+/* ---------- Modèles de séance ---------- */
 const ECHAUFFEMENT = "Échauffement : 20 min de footing + gammes";
 const ECHAUFFEMENT_VITESSE = "Échauffement : 20 min de footing + gammes + 3 accélérations progressives";
 const RETOUR_AU_CALME = "Retour au calme : 10 min de footing + étirements";
 
-// Chaque modèle : ses champs, puis comment fabriquer le titre et le contenu
+// Chaque modèle : ses champs (les durées, marquées « temps », sont en secondes),
+// puis comment fabriquer le titre et le contenu.
+// remplitDuree : la durée du modèle remplit la durée de la séance ; nbReps : nombre de répétitions (BPM par rép.)
 const MODELES = {
   footing: {
-    nom: "Footing",
-    champs: [{ id: "duree", label: "Durée", unite: "min", defaut: 45 }],
-    titre: (v) => "Footing " + enMinutes(v.duree),
-    corps: (v) => enMinutes(v.duree) + " en endurance fondamentale (aisance respiratoire, tu peux parler)",
+    nom: "Footing", remplitDuree: true,
+    champs: [{ id: "duree", label: "Durée", temps: true, defaut: 45 * 60 }],
+    titre: (v) => "Footing " + enDuree(v.duree),
+    corps: (v) => enDuree(v.duree) + " en endurance fondamentale (aisance respiratoire, tu peux parler)",
   },
   sortie_longue: {
-    nom: "Sortie longue",
-    champs: [{ id: "duree", label: "Durée", unite: "min", defaut: 75 }],
-    titre: (v) => "Sortie longue " + enMinutes(v.duree),
-    corps: (v) => enMinutes(v.duree) + " à allure régulière et confortable",
+    nom: "Sortie longue", remplitDuree: true,
+    champs: [{ id: "duree", label: "Durée", temps: true, defaut: 75 * 60 }],
+    titre: (v) => "Sortie longue " + enDuree(v.duree),
+    corps: (v) => enDuree(v.duree) + " à allure régulière et confortable",
   },
   fractionne: {
     nom: "Fractionné",
@@ -1249,21 +1275,35 @@ const MODELES = {
       { id: "series", label: "Nombre de séries", defaut: 2 },
       { id: "reps", label: "Répétitions par série", defaut: 5 },
       { id: "distance", label: "Distance", unite: "m", defaut: 400 },
-      { id: "recup", label: "Récup entre répétitions", unite: "s", defaut: 60 },
-      { id: "recupSerie", label: "Récup entre séries", unite: "min", defaut: 3 },
+      { id: "recup", label: "Récup entre répétitions", temps: true, defaut: 60 },
+      { id: "recupSerie", label: "Récup entre séries", temps: true, defaut: 3 * 60 },
     ],
-    titre: (v) => "Fractionné " + blocFractionne(v),
-    corps: (v) => blocFractionne(v) + ", r = " + enSecondes(v.recup) + (v.series > 1 ? ", R = " + enMinutes(v.recupSerie) : ""),
+    titre: (v) => "Fractionné " + blocSeries(v, v.distance + " m"),
+    corps: (v) => blocSeries(v, v.distance + " m") + ", r = " + enDuree(v.recup) + (v.series > 1 ? ", R = " + enDuree(v.recupSerie) : ""),
+  },
+  seuil: {
+    nom: "Seuil",
+    echauffement: ECHAUFFEMENT,
+    nbReps: (v) => v.series * v.reps,
+    champs: [
+      { id: "series", label: "Nombre de séries", defaut: 1 },
+      { id: "reps", label: "Répétitions par série", defaut: 3 },
+      { id: "duree", label: "Durée de chaque répétition", temps: true, defaut: 8 * 60 },
+      { id: "recup", label: "Récup entre répétitions", temps: true, defaut: 2 * 60 },
+      { id: "recupSerie", label: "Récup entre séries", temps: true, defaut: 4 * 60 },
+    ],
+    titre: (v) => "Seuil " + blocSeries(v, enDuree(v.duree)),
+    corps: (v) => blocSeries(v, enDuree(v.duree)) + " à allure seuil, r = " + enDuree(v.recup) + (v.series > 1 ? ", R = " + enDuree(v.recupSerie) : ""),
   },
   cotes: {
     nom: "Côtes",
     echauffement: ECHAUFFEMENT,
     champs: [
       { id: "reps", label: "Nombre de côtes", defaut: 8 },
-      { id: "duree", label: "Durée de chaque côte", unite: "s", defaut: 30 },
+      { id: "duree", label: "Durée de chaque côte", temps: true, defaut: 30 },
     ],
-    titre: (v) => "Côtes " + v.reps + " × " + enSecondes(v.duree),
-    corps: (v) => v.reps + " × " + enSecondes(v.duree) + " en côte, récupération en redescendant en trottinant",
+    titre: (v) => "Côtes " + v.reps + " × " + enDuree(v.duree),
+    corps: (v) => v.reps + " × " + enDuree(v.duree) + " en côte, récupération en redescendant en trottinant",
   },
   vitesse: {
     nom: "Vitesse",
@@ -1271,59 +1311,68 @@ const MODELES = {
     champs: [
       { id: "reps", label: "Répétitions", defaut: 6 },
       { id: "distance", label: "Distance", unite: "m", defaut: 60 },
-      { id: "recup", label: "Récupération", unite: "min", defaut: 3 },
+      { id: "recup", label: "Récupération", temps: true, defaut: 3 * 60 },
     ],
     titre: (v) => "Vitesse " + v.reps + " × " + v.distance + " m",
-    corps: (v) => v.reps + " × " + v.distance + " m à vitesse maximale, récupération " + enMinutes(v.recup) + " en marchant",
+    corps: (v) => v.reps + " × " + v.distance + " m à vitesse maximale, récupération " + enDuree(v.recup) + " en marchant",
   },
   renfo: {
-    nom: "Renforcement",
-    champs: [{ id: "duree", label: "Durée", unite: "min", defaut: 30 }],
-    titre: (v) => "Renforcement " + enMinutes(v.duree),
-    corps: (v) => enMinutes(v.duree) + " de renforcement musculaire : gainage, squats, fentes, pompes",
+    nom: "Renforcement", remplitDuree: true,
+    champs: [{ id: "duree", label: "Durée", temps: true, defaut: 30 * 60 }],
+    titre: (v) => "Renforcement " + enDuree(v.duree),
+    corps: (v) => enDuree(v.duree) + " de renforcement musculaire : gainage, squats, fentes, pompes",
   },
   libre: { nom: "Séance libre", libre: true },
 };
-function blocFractionne(v) {
-  const base = v.reps + " × " + v.distance + " m";
+// « 5 × 400 m », ou « 2 × (5 × 400 m) » avec plusieurs séries
+function blocSeries(v, effort) {
+  const base = v.reps + " × " + effort;
   return v.series > 1 ? v.series + " × (" + base + ")" : base;
 }
+// Nombre de répétitions d'une séance enregistrée (0 si ce n'est pas un seuil)
+function nbRepsDe(s) {
+  const m = MODELES[s.type];
+  return m && m.nbReps && s.parametres ? m.nbReps(s.parametres) : 0;
+}
 
-/* Éditeur « type de séance + champs préremplis », utilisé quand un athlète publie une séance.
+/* Éditeur « type de séance + champs préremplis », pour le coach et pour les athlètes.
    surChangement(type, valeurs) est appelé à chaque modification. */
-function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = false, surChangement = () => {} } = {}) {
+function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = false, apercu: titreApercu = "Aperçu dans le fil", surChangement = () => {} } = {}) {
   let type = MODELES[typeInitial] ? typeInitial : "footing";
-  const saisies = {};
+  const saisies = {}; // ce qui a été tapé, par type (gardé quand on change de type puis qu'on revient)
   const types = el("div", { class: "types" });
   const champs = el("div", { class: "champs" });
   const ech = el("input", { type: "checkbox", id: prefixe + "-echauffement" });
   ech.checked = echauffementCoche;
   const optionEch = el("label", { class: "option" }, [ech, "Ajouter l'échauffement et le retour au calme"]);
   const titre = el("input", { id: prefixe + "-titre", placeholder: "Séance de côtes en forêt" });
-  const contenu = el("textarea", { id: prefixe + "-contenu", placeholder: "Ce que tu as fait : échauffement, corps de séance, retour au calme…" });
+  const contenu = el("textarea", { id: prefixe + "-contenu", class: "grand", placeholder: "Échauffement, corps de séance, retour au calme…" });
   const libre = el("div", { class: "groupe-libre" }, [
     el("div", { class: "field" }, [el("label", { for: titre.id }, "Titre"), titre]),
     el("div", { class: "field" }, [el("label", { for: contenu.id }, "Contenu"), contenu]),
   ]);
   const apTitre = el("p", { class: "seance-titre" });
   const apContenu = el("p", { class: "seance-contenu" });
-  const apercu = el("div", { class: "apercu" }, [el("span", { class: "label" }, "Aperçu dans le fil"), apTitre, apContenu]);
+  const apercu = el("div", { class: "apercu" }, [el("span", { class: "label" }, titreApercu), apTitre, apContenu]);
 
+  const cle = (c, t = type) => t + "-" + c.id;
   function valeurs() {
     const v = {};
     (MODELES[type].champs || []).forEach((c) => {
-      const n = parseInt(saisies[c.id + "-" + type] ?? c.defaut, 10);
-      v[c.id] = n > 0 ? n : c.defaut;
+      const brut = saisies[cle(c)] ?? c.defaut;
+      const n = c.temps ? brut : parseInt(brut, 10);
+      v[c.id] = Number.isFinite(n) && n > 0 ? n : c.defaut;
     });
     return v;
   }
   function seance() {
     const m = MODELES[type];
-    if (m.libre) return { type, titre: titre.value.trim(), contenu: contenu.value.trim() };
+    if (m.libre) return { type, titre: titre.value.trim(), contenu: contenu.value.trim(), parametres: null };
     const v = valeurs();
+    const avecEch = !!(m.echauffement && ech.checked);
     const lignes = [m.corps(v)];
-    if (m.echauffement && ech.checked) { lignes.unshift(m.echauffement); lignes.push(RETOUR_AU_CALME); }
-    return { type, titre: m.titre(v), contenu: lignes.join("\n") };
+    if (avecEch) { lignes.unshift(m.echauffement); lignes.push(RETOUR_AU_CALME); }
+    return { type, titre: m.titre(v), contenu: lignes.join("\n"), parametres: { ...v, echauffement: avecEch } };
   }
   function maj() {
     if (!MODELES[type].libre) {
@@ -1341,9 +1390,12 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     optionEch.hidden = !m.echauffement;
     champs.replaceChildren(...(m.champs || []).map((c) => {
       const id = prefixe + "-" + type + "-" + c.id;
+      if (c.temps) {
+        return champTemps(id, c.label, saisies[cle(c)] ?? c.defaut, (v) => { saisies[cle(c)] = v; maj(); }).bloc;
+      }
       const input = el("input", { type: "number", id, min: "1", step: "1", inputmode: "numeric" });
-      input.value = saisies[c.id + "-" + type] ?? c.defaut;
-      input.addEventListener("input", () => { saisies[c.id + "-" + type] = input.value; maj(); });
+      input.value = saisies[cle(c)] ?? c.defaut;
+      input.addEventListener("input", () => { saisies[cle(c)] = input.value; maj(); });
       return el("div", { class: "field" }, [
         el("label", { for: id }, c.label),
         el("div", { class: "avec-unite" }, [input, c.unite ? el("span", {}, c.unite) : null]),
@@ -1351,11 +1403,17 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     }));
     maj();
   }
-  types.replaceChildren(...Object.entries(MODELES).flatMap(([cle, m]) => {
-    const id = prefixe + "-type-" + cle;
-    const input = el("input", { type: "radio", name: prefixe + "-type", id, value: cle });
-    if (cle === type) input.checked = true;
-    input.addEventListener("change", () => { type = cle; construireChamps(); });
+  function choisir(t) {
+    type = MODELES[t] ? t : "footing";
+    const radio = $(prefixe + "-type-" + type) || types.querySelector('input[value="' + type + '"]');
+    if (radio) radio.checked = true;
+    construireChamps();
+  }
+  types.replaceChildren(...Object.entries(MODELES).flatMap(([k, m]) => {
+    const id = prefixe + "-type-" + k;
+    const input = el("input", { type: "radio", name: prefixe + "-type", id, value: k });
+    if (k === type) input.checked = true;
+    input.addEventListener("change", () => { type = k; construireChamps(); });
     return [input, el("label", { for: id }, m.nom)];
   }));
   ech.addEventListener("change", maj);
@@ -1368,6 +1426,21 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     ]),
     seance,
     get type() { return type; },
+    choisir,
+    // Recharge une séance enregistrée : avec ses réglages si on les a, sinon en « séance libre »
+    charger(s) {
+      const m = MODELES[s.type];
+      if (m && !m.libre && s.parametres) {
+        (m.champs || []).forEach((c) => { if (s.parametres[c.id] != null) saisies[cle(c, s.type)] = s.parametres[c.id]; });
+        ech.checked = !!s.parametres.echauffement;
+        choisir(s.type);
+      } else {
+        titre.value = s.titre || "";
+        contenu.value = s.contenu || "";
+        choisir("libre");
+      }
+    },
+    vider(t) { titre.value = ""; contenu.value = ""; choisir(t); },
   };
 }
 
@@ -1383,7 +1456,7 @@ function blocConsignes(s) {
   return el("div", { class: "consignes" }, [el("span", { class: "label" }, "Consignes du coach"), el("p", {}, s.consignes)]);
 }
 
-/* ---------- Distance, durée, allure ---------- */
+/* ---------- Distance, durée, allure, forme, BPM ---------- */
 // Accepte « 8,5 » comme « 8.5 » ; renvoie null si vide ou invalide
 function lireNombre(texte) {
   const n = parseFloat(String(texte || "").replace(",", ".").trim());
@@ -1393,43 +1466,149 @@ function formatKm(km) {
   return (Math.round(km * 10) / 10).toLocaleString("fr-FR") + " km";
 }
 // Allure en minutes par kilomètre : « 5:18 /km »
-function allure(km, min) {
-  if (!km || !min) return null;
-  const secParKm = Math.round((min * 60) / km);
+function allure(km, sec) {
+  if (!km || !sec) return null;
+  const secParKm = Math.round(sec / km);
   return Math.floor(secParKm / 60) + ":" + String(secParKm % 60).padStart(2, "0") + " /km";
 }
-// Ligne de pastilles : difficulté, distance, durée, allure
+function texteBpm(moy, max) {
+  if (!moy && !max) return null;
+  return "♥ " + [moy ? moy + " moy" : null, max ? max + " max" : null].filter(Boolean).join(" · ") + " bpm";
+}
+// BPM de chaque répétition, en petit tableau
+function tableauReps(reps) {
+  if (!Array.isArray(reps) || !reps.some((r) => r && (r.moy || r.max))) return null;
+  return el("div", { class: "table-wrap" }, el("table", { class: "reps-table" }, [
+    el("thead", {}, el("tr", {}, [el("th", {}, "Répétition"), el("th", {}, "BPM moy."), el("th", {}, "BPM max")])),
+    el("tbody", {}, reps.map((r, i) => el("tr", {}, [
+      el("td", {}, "Rép. " + (i + 1)), el("td", {}, r && r.moy ? String(r.moy) : "–"), el("td", {}, r && r.max ? String(r.max) : "–"),
+    ]))),
+  ]));
+}
+// Pastilles : difficulté, forme, distance, durée, allure, BPM ; puis le tableau des répétitions
 function etatEffort(s, debut = []) {
   const km = Number(s.distance_km) || 0;
-  const elements = [
+  const sec = dureeSec(s);
+  const pastilles = [
     ...debut,
     s.ressenti ? badgeRessenti(s.ressenti) : null,
+    s.forme ? el("span", { class: "chip" }, "Forme " + s.forme + "/5") : null,
     km ? el("span", { class: "chip" }, formatKm(km)) : null,
-    s.duree_min ? el("span", { class: "chip" }, enMinutes(s.duree_min)) : null,
-    allure(km, s.duree_min) ? el("span", { class: "chip" }, allure(km, s.duree_min)) : null,
+    sec ? el("span", { class: "chip" }, enDuree(sec)) : null,
+    allure(km, sec) ? el("span", { class: "chip" }, allure(km, sec)) : null,
+    texteBpm(s.bpm_moy, s.bpm_max) ? el("span", { class: "chip coeur" }, texteBpm(s.bpm_moy, s.bpm_max)) : null,
   ].filter(Boolean);
-  return elements.length ? el("div", { class: "etat" }, elements) : null;
+  const reps = tableauReps(s.reps_bpm);
+  if (!pastilles.length && !reps) return null;
+  return el("div", { class: "effort" }, [pastilles.length ? el("div", { class: "etat" }, pastilles) : null, reps]);
 }
-// Lit et vérifie les champs distance et durée d'un formulaire
-function lireEffort(champDistance, champDuree) {
-  const distance_km = lireNombre(champDistance.value);
-  const duree = lireNombre(champDuree.value);
-  if (champDistance.value.trim() && distance_km === null) throw erreurLisible("La distance doit être un nombre, par exemple 8,5.");
-  if (champDuree.value.trim() && duree === null) throw erreurLisible("La durée doit être un nombre de minutes, par exemple 45.");
-  if (distance_km !== null && distance_km > 300) throw erreurLisible("La distance semble trop grande : indique-la en kilomètres.");
-  if (duree !== null && duree > 1440) throw erreurLisible("La durée semble trop grande : indique-la en minutes.");
-  return { distance_km, duree_min: duree === null ? null : Math.round(duree) };
-}
+
+// Distance + durée de la séance (h / min / s)
 function champsEffort(prefixe, s = {}) {
   const dist = el("input", { id: prefixe + "-distance", type: "text", inputmode: "decimal", placeholder: "8,5" });
-  const duree = el("input", { id: prefixe + "-duree", type: "text", inputmode: "numeric", placeholder: "45" });
   if (s.distance_km) dist.value = String(Number(s.distance_km)).replace(".", ",");
-  if (s.duree_min) duree.value = String(s.duree_min);
+  let dureeTapee = dureeSec(s) != null;
+  const temps = champTemps(prefixe + "-duree", "Durée de la séance", dureeSec(s), (v) => { dureeTapee = v != null; });
   const bloc = el("div", { class: "saisie-effort" }, [
     el("div", { class: "field" }, [el("label", { for: dist.id }, "Distance (km)"), dist]),
-    el("div", { class: "field" }, [el("label", { for: duree.id }, "Durée (min)"), duree]),
+    temps.bloc,
   ]);
-  return { bloc, dist, duree };
+  return {
+    bloc,
+    // Propose une durée (celle du modèle), sauf si elle a déjà été tapée
+    proposerDuree(sec) { if (!dureeTapee) temps.poser(sec == null ? null : sec); },
+    lire() {
+      const distance_km = lireNombre(dist.value);
+      if (dist.value.trim() && distance_km === null) throw erreurLisible("La distance doit être un nombre, par exemple 8,5.");
+      if (distance_km !== null && distance_km > 300) throw erreurLisible("La distance semble trop grande : indique-la en kilomètres.");
+      const d = temps.valeur();
+      if (Number.isNaN(d)) throw erreurLisible("La durée doit être écrite avec des nombres (heures, minutes, secondes).");
+      if (d !== null && d > 86400) throw erreurLisible("La durée semble trop grande (plus de 24 h).");
+      return { distance_km, duree_s: d, duree_min: d === null ? null : Math.round(d / 60) };
+    },
+  };
+}
+
+function lireBpm(input, nom) {
+  const t = input.value.trim();
+  if (!t) return null;
+  const n = Math.round(Number(t.replace(",", ".")));
+  if (!Number.isFinite(n) || n < 30 || n > 250) throw erreurLisible(nom + " : indique un nombre de battements par minute entre 30 et 250.");
+  return n;
+}
+function caseBpm(id, nom, valeur) {
+  const i = el("input", { id, type: "text", inputmode: "numeric", placeholder: nom === "BPM moyen" ? "150" : "175", autocomplete: "off" });
+  if (valeur) i.value = String(valeur);
+  return i;
+}
+
+// Forme du jour (1 à 5) + BPM moyen et max de la séance
+function champsForme(prefixe, s = {}) {
+  const ligne = el("div", { class: "rpe-ligne forme-ligne" });
+  const noms = ["", "Épuisé", "Fatigué", "Normal", "En forme", "Au top"];
+  for (let n = 1; n <= 5; n++) {
+    const id = prefixe + "-forme-" + n;
+    const input = el("input", { type: "radio", name: prefixe + "-forme", id, value: String(n) });
+    if (s.forme === n) input.checked = true;
+    ligne.append(input, el("label", { for: id, class: "forme", title: noms[n] }, String(n)));
+  }
+  const moy = caseBpm(prefixe + "-bpm-moy", "BPM moyen", s.bpm_moy);
+  const max = caseBpm(prefixe + "-bpm-max", "BPM max", s.bpm_max);
+  const bloc = el("div", { class: "groupe-libre" }, [
+    el("fieldset", {}, [el("legend", { class: "label" }, "Ma forme du jour"), ligne, el("p", { class: "aide" }, "1 = épuisé · 3 = normal · 5 = au top")]),
+    el("div", { class: "row" }, [
+      el("div", { class: "field" }, [el("label", { for: moy.id }, "BPM moyen"), moy]),
+      el("div", { class: "field" }, [el("label", { for: max.id }, "BPM max"), max]),
+    ]),
+  ]);
+  return {
+    bloc,
+    lire() {
+      const c = ligne.querySelector("input:checked");
+      const bpm_moy = lireBpm(moy, "BPM moyen"), bpm_max = lireBpm(max, "BPM max");
+      if (bpm_moy && bpm_max && bpm_moy > bpm_max) throw erreurLisible("Le BPM moyen ne peut pas être plus élevé que le BPM max.");
+      return { forme: c ? Number(c.value) : null, bpm_moy, bpm_max };
+    },
+  };
+}
+
+// BPM moyen et max de chaque répétition (séances de seuil)
+function champsReps(prefixe, nb, existants = []) {
+  let gardes = (existants || []).map((r) => ({ ...r }));
+  const grille = el("div", { class: "reps" });
+  const bloc = el("fieldset", { class: "reps-bloc" }, [
+    el("legend", { class: "label" }, "BPM de chaque répétition (facultatif)"), grille,
+  ]);
+  let lignes = [];
+  function garder() {
+    lignes.forEach((l, i) => { gardes[i] = { moy: l.moy.value.trim(), max: l.max.value.trim() }; });
+  }
+  function maj(n) {
+    garder();
+    lignes = [];
+    grille.replaceChildren(el("span", { class: "label" }, ""), el("span", { class: "label" }, "Moyen"), el("span", { class: "label" }, "Max"));
+    for (let i = 0; i < n; i++) {
+      const moy = caseBpm(prefixe + "-moy-" + i, "BPM moyen", gardes[i] && gardes[i].moy);
+      const max = caseBpm(prefixe + "-max-" + i, "BPM max", gardes[i] && gardes[i].max);
+      moy.placeholder = max.placeholder = "–"; // pas d'exemple chiffré : il ressemblerait à une vraie valeur
+      moy.setAttribute("aria-label", "Répétition " + (i + 1) + " : BPM moyen");
+      max.setAttribute("aria-label", "Répétition " + (i + 1) + " : BPM max");
+      grille.append(el("span", { class: "rep-nom" }, "Rép. " + (i + 1)), moy, max);
+      lignes.push({ moy, max });
+    }
+    bloc.hidden = n === 0;
+  }
+  maj(nb);
+  return {
+    bloc, maj,
+    lire() {
+      const res = lignes.map((l, i) => {
+        const moy = lireBpm(l.moy, "Rép. " + (i + 1) + ", BPM moyen"), max = lireBpm(l.max, "Rép. " + (i + 1) + ", BPM max");
+        return moy || max ? { moy, max } : null;
+      });
+      return res.some(Boolean) ? res : null;
+    },
+  };
 }
 
 // Réduit une photo en carré de 320 px (plus légère à envoyer et à afficher)
@@ -2007,19 +2186,25 @@ let ressentiPublier = null;
 let photoPublier = null;
 let modelePublier = null;
 let choixAvec = null;
-let dureeTapee = false; // la durée a-t-elle été tapée à la main ?
-$("pub-duree").addEventListener("input", () => { dureeTapee = $("pub-duree").value.trim() !== ""; });
+let effortPublier = null, formePublier = null, repsPublier = null;
 $("ouvrir-publier").addEventListener("click", () => {
   $("form-publier").reset();
   $("pub-date").value = aujourdhui();
-  dureeTapee = false;
-  // Pour un footing, une sortie longue ou du renfo, la durée du modèle remplit la case « Durée »
+  effortPublier = champsEffort("pub");
+  repsPublier = champsReps("pub-rep", 0);
+  formePublier = champsForme("pub");
+  $("pub-effort").replaceChildren(effortPublier.bloc);
+  $("pub-reps").replaceChildren(repsPublier.bloc);
+  $("pub-forme").replaceChildren(formePublier.bloc);
+  // Footing, sortie longue, renfo : la durée du modèle remplit la durée de la séance.
+  // Seuil : une ligne de BPM par répétition.
   modelePublier = editeurModele("pub", {
     typeInitial: lire("couloir-type-pub") || "footing",
     surChangement: (type, v) => {
       ecrire("couloir-type-pub", type);
-      const dureeMin = (MODELES[type].champs || []).find((c) => c.id === "duree" && c.unite === "min");
-      if (!dureeTapee) $("pub-duree").value = dureeMin ? String(v.duree) : "";
+      const m = MODELES[type];
+      effortPublier.proposerDuree(m.remplitDuree ? v.duree : null);
+      repsPublier.maj(m.nbReps ? m.nbReps(v) : 0);
     },
   });
   $("pub-modele").replaceChildren(modelePublier.bloc);
@@ -2040,20 +2225,23 @@ $("annuler-publier").addEventListener("click", fermerPublier);
 
 $("form-publier").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const { type, titre, contenu } = modelePublier.seance();
+  const { type, titre, contenu, parametres } = modelePublier.seance();
   if (!titre && !contenu) return afficherMessage("erreur-publier", "Donne au moins un titre ou un contenu à ta séance.");
   try {
-    const effort = lireEffort($("pub-distance"), $("pub-duree"));
+    const effort = effortPublier.lire();
+    const forme = formePublier.lire();
+    const reps_bpm = repsPublier.lire();
     const avec = choixAvec ? choixAvec.valeurs() : [];
     await pendant($("bouton-publier"), "Publication…", async () => {
       const commun = {
-        coach_id: null, type, date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null,
+        coach_id: null, type, parametres, date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null,
         fait: true, fait_le: new Date().toISOString(), ...effort,
       };
       // Ma séance (avec mon ressenti, mon commentaire et la photo)…
       const principale = {
         ...commun, athlete_id: moi.id,
         ressenti: ressentiPublier.valeur(), commentaire: $("pub-commentaire").value.trim() || null,
+        ...forme, reps_bpm,
         photo_url: await photoPublier.url(moi.id),
       };
       if (!avec.length) return donnees.envoyerSeance(principale);
@@ -2161,7 +2349,8 @@ function carteSemaine(s, surChangement = () => {}) {
     modifier.addEventListener("click", ouvrirFormulaire);
     const decocher = el("button", { type: "button", class: "lien petit" }, "Marquer comme non faite");
     decocher.addEventListener("click", async () => {
-      const maj = { fait: false, fait_le: null, ressenti: null, commentaire: null, distance_km: null, duree_min: null, photo_url: null };
+      const maj = { fait: false, fait_le: null, ressenti: null, commentaire: null, distance_km: null, duree_min: null, duree_s: null,
+        forme: null, bpm_moy: null, bpm_max: null, reps_bpm: null, photo_url: null };
       try { await pendant(decocher, "…", () => donnees.majSeance(s.id, maj)); Object.assign(s, maj); afficherEtat(); majProgression(); majObjectifsSemaine(); surChangement("decochee"); }
       catch (e) { zone.append(el("p", { class: "error" }, messageErreur(e))); }
     });
@@ -2196,6 +2385,11 @@ function carteSemaine(s, surChangement = () => {}) {
   function ouvrirFormulaire() {
     const rpe = choixRessenti("rpe-" + s.id, s.ressenti);
     const effort = champsEffort("effort-" + s.id, s);
+    // Séance prévue avec une durée (footing…) : on la propose
+    if (MODELES[s.type] && MODELES[s.type].remplitDuree && s.parametres) effort.proposerDuree(s.parametres.duree);
+    const forme = champsForme("forme-" + s.id, s);
+    const nb = nbRepsDe(s);
+    const reps = nb ? champsReps("reps-" + s.id, nb, s.reps_bpm) : null;
     const photo = champPhoto("seance-" + s.id, s.photo_url);
     const idCom = "com-" + s.id;
     const com = el("textarea", { id: idCom, placeholder: "Comment ça s'est passé ? Sensations, chronos, douleurs…" });
@@ -2211,7 +2405,9 @@ function carteSemaine(s, surChangement = () => {}) {
           fait_le: s.fait && s.fait_le ? s.fait_le : new Date().toISOString(),
           ressenti: rpe.valeur(),
           commentaire: com.value.trim() || null,
-          ...lireEffort(effort.dist, effort.duree),
+          ...effort.lire(),
+          ...forme.lire(),
+          reps_bpm: reps ? reps.lire() : null,
         };
         await pendant(valider, "Enregistrement…", async () => {
           maj.photo_url = await photo.url(moi.id);
@@ -2231,7 +2427,9 @@ function carteSemaine(s, surChangement = () => {}) {
 
     zone.replaceChildren(el("div", { class: "form-ressenti" }, [
       effort.bloc,
+      reps ? reps.bloc : null,
       rpe,
+      forme.bloc,
       el("div", { class: "field" }, [el("label", { for: idCom }, "Ton ressenti"), com]),
       photo.bloc,
       erreur,
@@ -2473,19 +2671,10 @@ $("voir-profil-athlete").addEventListener("click", () => {
 /* ---------- Modifier une séance déjà envoyée ---------- */
 let seanceEnModif = null;
 
-function choisirType(cle) {
-  typeChoisi = cle;
-  const radio = $("type-" + cle);
-  if (radio) radio.checked = true;
-  construireChamps();
-}
-
-// Charge la séance dans le formulaire, en mode « séance libre » pour pouvoir tout retoucher
+// Charge la séance dans le formulaire : avec ses réglages (durée, répétitions…) si on les a, sinon en « séance libre »
 function commencerModif(s) {
   seanceEnModif = s;
-  choisirType("libre");
-  $("seance-titre").value = s.titre || "";
-  $("seance-contenu").value = s.contenu || "";
+  editeurPlanif.charger(s);
   $("seance-date").value = s.date || "";
   $("seance-consignes").value = s.consignes || "";
   choixAthlete.disabled = true;
@@ -2499,7 +2688,6 @@ function commencerModif(s) {
   afficherMessage("ok-seance", "");
   afficherMessage("erreur-seance", "");
   $("form-seance").scrollIntoView({ behavior: "smooth", block: "start" });
-  $("seance-titre").focus({ preventScroll: true });
 }
 
 function finirModif() {
@@ -2509,10 +2697,8 @@ function finirModif() {
   $("info-modif").hidden = true;
   $("bouton-seance").textContent = "Envoyer la séance";
   $("annuler-modif").hidden = true;
-  $("seance-titre").value = "";
-  $("seance-contenu").value = "";
   $("seance-consignes").value = "";
-  choisirType(MODELES[lire("couloir-type")] ? lire("couloir-type") : "footing");
+  editeurPlanif.vider(MODELES[lire("couloir-type")] ? lire("couloir-type") : "footing");
 }
 $("annuler-modif").addEventListener("click", () => { finirModif(); afficherMessage("ok-seance", ""); });
 
@@ -2521,7 +2707,7 @@ $("form-seance").addEventListener("submit", async (event) => {
   afficherMessage("ok-seance", "");
   afficherMessage("erreur-seance", "");
   const athlete = athletes.find((a) => a.id === choixAthlete.value);
-  const { titre, contenu } = seanceDuModele();
+  const { type: typeChoisi, titre, contenu, parametres } = editeurPlanif.seance();
   const date = $("seance-date").value || null;
   const consignes = $("seance-consignes").value.trim() || null;
   if (!titre && !contenu) return afficherMessage("erreur-seance", "Donne au moins un titre ou un contenu à la séance.");
@@ -2531,7 +2717,7 @@ $("form-seance").addEventListener("submit", async (event) => {
       // En mode libre, on garde le type d'origine (footing, côtes…) pour l'étiquette
       const type = typeChoisi === "libre" ? (seanceEnModif.type || "libre") : typeChoisi;
       await pendant($("bouton-seance"), "Enregistrement…", () =>
-        donnees.majSeance(seanceEnModif.id, { date, type, titre: titre || null, contenu: contenu || null, consignes }));
+        donnees.majSeance(seanceEnModif.id, { date, type, parametres, titre: titre || null, contenu: contenu || null, consignes }));
       finirModif();
       afficherMessage("ok-seance", "Séance modifiée.");
       afficherSeancesCoach();
@@ -2546,7 +2732,7 @@ $("form-seance").addEventListener("submit", async (event) => {
   try {
     // Une séance par personne : chacun la coche et donne son ressenti de son côté
     await pendant($("bouton-seance"), "Envoi…", () => donnees.envoyerSeance(ids.map((id) => ({
-      athlete_id: id, coach_id: moi.id, date, type: typeChoisi,
+      athlete_id: id, coach_id: moi.id, date, type: typeChoisi, parametres,
       titre: titre || null, contenu: contenu || null, consignes,
     }))));
     const noms = ids.map((id) => { const a = athletes.find((x) => x.id === id); return a.estMoi ? "toi" : a.prenom; });
@@ -2560,65 +2746,14 @@ $("form-seance").addEventListener("submit", async (event) => {
   }
 });
 
-/* ---------- Choix du type de séance et champs préremplis ---------- */
-let typeChoisi = MODELES[lire("couloir-type")] ? lire("couloir-type") : "footing";
-const valeursSaisies = {}; // gardées quand on change de type puis qu'on revient
-
-function construireTypes() {
-  $("types").replaceChildren(...Object.entries(MODELES).flatMap(([cle, m]) => {
-    const input = el("input", { type: "radio", name: "type-seance", id: "type-" + cle, value: cle });
-    if (cle === typeChoisi) input.checked = true;
-    input.addEventListener("change", () => {
-      typeChoisi = cle;
-      if (!seanceEnModif) ecrire("couloir-type", cle);
-      construireChamps();
-    });
-    return [input, el("label", { for: "type-" + cle }, m.nom)];
-  }));
-  construireChamps();
-}
-
-function construireChamps() {
-  const m = MODELES[typeChoisi];
-  $("champs-libre").hidden = !m.libre;
-  $("option-echauffement").hidden = !m.echauffement;
-  $("apercu").hidden = !!m.libre;
-  $("champs-modele").hidden = !!m.libre;
-  $("champs-modele").replaceChildren(...(m.champs || []).map((c) => {
-    const id = "mod-" + typeChoisi + "-" + c.id;
-    const input = el("input", { type: "number", id, min: "1", step: "1", inputmode: "numeric" });
-    input.value = valeursSaisies[id] ?? c.defaut;
-    input.addEventListener("input", () => { valeursSaisies[id] = input.value; majApercu(); });
-    return el("div", { class: "field" }, [
-      el("label", { for: id }, c.label),
-      el("div", { class: "avec-unite" }, [input, c.unite ? el("span", {}, c.unite) : null]),
-    ]);
-  }));
-  majApercu();
-}
-
-// Fabrique le titre et le contenu à partir du modèle et des champs remplis
-function seanceDuModele() {
-  const m = MODELES[typeChoisi];
-  if (m.libre) return { titre: $("seance-titre").value.trim(), contenu: $("seance-contenu").value.trim() };
-  const v = {};
-  m.champs.forEach((c) => {
-    const n = parseInt($("mod-" + typeChoisi + "-" + c.id).value, 10);
-    v[c.id] = n > 0 ? n : c.defaut;
-  });
-  const lignes = [m.corps(v)];
-  if (m.echauffement && $("echauffement").checked) { lignes.unshift(m.echauffement); lignes.push(RETOUR_AU_CALME); }
-  return { titre: m.titre(v), contenu: lignes.join("\n") };
-}
-
-function majApercu() {
-  if (MODELES[typeChoisi].libre) return;
-  const { titre, contenu } = seanceDuModele();
-  $("apercu-titre").textContent = titre;
-  $("apercu-contenu").textContent = contenu;
-}
-$("echauffement").addEventListener("change", majApercu);
-construireTypes();
+/* ---------- Type de séance et champs préremplis (éditeur commun) ---------- */
+const editeurPlanif = editeurModele("planif", {
+  typeInitial: lire("couloir-type") || "footing",
+  echauffementCoche: true,
+  apercu: "Aperçu pour l'athlète",
+  surChangement: (type) => { if (typeof seanceEnModif !== "undefined" && !seanceEnModif) ecrire("couloir-type", type); },
+});
+$("planif-modele").replaceChildren(editeurPlanif.bloc);
 
 /* =========================================================
    8 bis. STATISTIQUES ET TROPHÉES
@@ -2655,7 +2790,7 @@ function statsPersonne(seances) {
   let km = 0, min = 0, maxKm = 0, rpeTotal = 0, rpeNb = 0, durs = 0;
   const types = new Set();
   seances.forEach((s) => {
-    const d = Number(s.distance_km) || 0, t = s.duree_min || 0;
+    const d = Number(s.distance_km) || 0, t = Math.round((dureeSec(s) || 0) / 60);
     const w = parSemaine[cleSemaine(jourDeSeance(s))] ||= semaineVide();
     w.n++; w.km += d; w.min += t; w.maxKm = Math.max(w.maxKm, d); w.types.add(s.type || "libre");
     if (s.ressenti >= 8) { w.durs++; durs++; }
