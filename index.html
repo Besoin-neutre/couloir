@@ -433,7 +433,7 @@ button.cocher:hover .case { background: var(--ok); }
 .reps-table { border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; min-width: 200px; }
 .reps-table th, .reps-table td { padding: 4px 10px; border-bottom: 1px solid var(--line); text-align: center; }
 .reps-table th:first-child, .reps-table td:first-child { text-align: left; padding-left: 0; }
-.reps-table th:last-child, .reps-table td:last-child { text-align: center; }
+.table-wrap .reps-table th:last-child, .table-wrap .reps-table td:last-child { text-align: center; }
 .reps-table th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .chip.coeur { border-color: color-mix(in srgb, var(--erreur) 45%, var(--line)); }
 
@@ -723,7 +723,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
         <fieldset id="pub-avec-bloc">
           <legend class="label">Avec qui ? (facultatif)</legend>
           <div id="pub-avec"></div>
-          <p class="aide">Ces personnes recevront la séance en haut de leur fil : elles pourront la valider telle quelle ou la corriger (une répétition de plus, leurs BPM…). Elle n'apparaîtra qu'une fois dans le fil.</p>
+          <p class="aide">Ces personnes recevront la séance en haut de leur fil : elles pourront la valider telle quelle ou la corriger (une répétition de plus, leurs BPM, leurs photos…). Quand elles la valident, leur version apparaît aussi dans le fil.</p>
         </fieldset>
         <div id="pub-effort"></div>
         <div id="pub-reps"></div>
@@ -1108,25 +1108,23 @@ const donnees = {
   },
 
   // Séances
-  // Le fil ne montre que la séance « principale » d'un groupe (celle de la personne qui a publié)
-  // personnes : n'afficher que leurs séances (y compris celles où elles étaient « avec » quelqu'un)
+  // Le fil montre chaque séance faite, y compris la version de chaque personne d'une séance à plusieurs
+  // (elle apparaît quand la personne la valide, avec ses propres photos, BPM, commentaire…)
+  // personnes : n'afficher que leurs séances
   async fil(de, a, personnes = []) {
-    let requete = sb.from("seances").select(CHAMPS_FIL + ", groupe_id").eq("fait", true).eq("principal", true);
-    if (personnes.length) {
-      const g = verifier(await sb.from("seances").select("groupe_id")
-        .in("athlete_id", personnes).eq("principal", false).not("groupe_id", "is", null));
-      const groupesAvec = [...new Set(g.map((x) => x.groupe_id))];
-      requete = groupesAvec.length
-        ? requete.or("athlete_id.in.(" + personnes.join(",") + "),groupe_id.in.(" + groupesAvec.join(",") + ")")
-        : requete.in("athlete_id", personnes);
-    }
+    let requete = sb.from("seances").select(CHAMPS_FIL + ", groupe_id, principal").eq("fait", true);
+    if (personnes.length) requete = requete.in("athlete_id", personnes);
     const posts = verifier(await requete.order("fait_le", { ascending: false }).range(de, a));
-    const groupes = posts.filter((p) => p.groupe_id).map((p) => p.groupe_id);
+    const groupes = [...new Set(posts.filter((p) => p.groupe_id).map((p) => p.groupe_id))];
     if (groupes.length) {
-      const autres = verifier(await sb.from("seances")
-        .select("groupe_id, athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url, couleur)")
-        .in("groupe_id", groupes).eq("principal", false));
-      posts.forEach((p) => { p.avec = autres.filter((x) => x.groupe_id === p.groupe_id).map((x) => x.athlete).filter(Boolean); });
+      // Tout le groupe (la personne qui a publié d'abord), pour écrire « avec Lou et Tom »
+      const membres = verifier(await sb.from("seances")
+        .select("groupe_id, principal, athlete:profils!seances_athlete_id_fkey(id, prenom, nom, photo_url, couleur)")
+        .in("groupe_id", groupes));
+      membres.sort((x, y) => (y.principal === true) - (x.principal === true));
+      posts.forEach((p) => {
+        p.avec = membres.filter((x) => x.groupe_id === p.groupe_id && x.athlete && x.athlete.id !== p.athlete_id).map((x) => x.athlete);
+      });
     }
     return posts;
   },
@@ -1155,7 +1153,12 @@ const donnees = {
     if (error) throw error;
     return count || 0;
   },
-  async supprimerGroupe(groupeId) { verifier(await sb.from("seances").delete().eq("groupe_id", groupeId)); },
+  // Supprimer la séance que j'ai publiée à plusieurs : la mienne et les propositions pas encore validées
+  // (ceux qui l'ont validée gardent leur séance : c'est devenu la leur)
+  async supprimerGroupe(groupeId, monId) {
+    verifier(await sb.from("seances").delete().eq("groupe_id", groupeId).eq("principal", false).eq("fait", false));
+    verifier(await sb.from("seances").delete().eq("id", monId));
+  },
   async semaine(athleteId, debut, fin) {
     return verifier(await sb.from("seances").select(CHAMPS_SEANCE)
       .eq("athlete_id", athleteId).not("coach_id", "is", null)
@@ -1187,7 +1190,7 @@ const donnees = {
   // Nouveautés depuis la dernière visite
   async nbNouveauxPosts(moiId, depuis) {
     const { count, error } = await sb.from("seances").select("id", { count: "exact", head: true })
-      .eq("fait", true).eq("principal", true).neq("athlete_id", moiId).gt("fait_le", depuis);
+      .eq("fait", true).neq("athlete_id", moiId).gt("fait_le", depuis);
     if (error) throw error;
     return count || 0;
   },
@@ -2296,6 +2299,10 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "2.4", nom: "Chacun son post", date: "1er novembre 2026", nouveautes: [
+    "Une séance faite à plusieurs : quand chacun la valide, sa version apparaît dans le fil, avec ses photos, ses BPM et son commentaire.",
+    "Le tri du fil montre maintenant exactement les séances de la personne choisie.",
+  ] },
   { num: "2.3", nom: "À ta sauce", date: "1er novembre 2026", nouveautes: [
     "L'échauffement et le retour au calme se règlent : durée du footing, et ce qu'on ajoute (gammes, accélérations, étirements…).",
     "Le texte de chaque séance se modifie directement : allures, consignes, tout ce qu'on veut.",
@@ -2580,7 +2587,8 @@ function etiquetteNouveau() { return el("span", { class: "nouveau" }, "Nouveau")
 function carteFil(s) {
   const auteur = s.athlete || {};
   const estNouveau = vuAvant.fil && s.fait_le > vuAvant.fil && moi && auteur.id !== moi.id;
-  const quoi = !s.coach_id ? "a publié une séance"
+  const quoi = s.principal === false ? "a fait une séance"
+    : !s.coach_id ? "a publié une séance"
     : s.coach_id === auteur.id ? "a fait sa séance prévue"
     : "a fait la séance " + de(nomComplet(s.coach));
   // « avec Tom et Inès » : chaque prénom est cliquable
@@ -2612,8 +2620,8 @@ function carteFil(s) {
     const b = el("button", { type: "button", class: "lien petit" }, "Supprimer ma publication");
     b.addEventListener("click", async () => {
       try {
-        // Une séance faite à plusieurs disparaît pour tout le monde
-        await pendant(b, "Suppression…", () => (s.groupe_id ? donnees.supprimerGroupe(s.groupe_id) : donnees.supprimerSeance(s.id)));
+        // Ma séance publiée à plusieurs : les propositions pas encore validées disparaissent avec elle
+        await pendant(b, "Suppression…", () => (s.groupe_id && s.principal !== false ? donnees.supprimerGroupe(s.groupe_id, s.id) : donnees.supprimerSeance(s.id)));
         carte.remove();
       }
       catch (e) { b.replaceWith(el("p", { class: "error" }, messageErreur(e))); }
