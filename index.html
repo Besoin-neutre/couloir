@@ -376,7 +376,17 @@ button.cocher:hover .case { background: var(--ok); }
 .choix-rapides { display: flex; gap: 16px; margin-top: 8px; }
 
 /* Calendrier */
-.calendrier { padding: 12px; gap: 8px; }
+.calendrier { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.cal-titre { font-size: 24px; text-align: center; }
+.periodes { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.periodes .label { margin-right: 4px; }
+.periodes button[aria-pressed="true"] { background: var(--track); border-color: var(--track); color: var(--surface); }
+.aide-cal { margin: 0; font-weight: 600; color: var(--track); }
+.jour.plage { background: color-mix(in srgb, var(--track) 18%, var(--surface)); }
+.jour.plage-bout { background: var(--track); color: var(--surface); }
+.jour.plage-bout .point.prevu { border-color: var(--surface); }
+.jour.plage-bout .point.fait, .jour.plage-bout .point.manque { background: var(--surface); }
+.bilan { display: grid; gap: 12px; }
 .cal-grille { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .cal-entete span { text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .05em; }
 .jour {
@@ -604,13 +614,13 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
       </div>
 
       <form class="card" id="form-publier" hidden novalidate>
-        <h3>Une séance faite de ton côté</h3>
+        <h3 id="pub-titre-form">Une séance faite de ton côté</h3>
         <div class="field" style="max-width:220px">
           <label for="pub-date">Date</label>
           <input id="pub-date" type="date">
         </div>
         <div id="pub-modele"></div>
-        <fieldset>
+        <fieldset id="pub-avec-bloc">
           <legend class="label">Avec qui ? (facultatif)</legend>
           <div id="pub-avec"></div>
           <p class="aide">La séance comptera aussi dans leurs statistiques et leurs trophées. Elle n'apparaîtra qu'une fois dans le fil.</p>
@@ -643,26 +653,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
       </div>
 
       <!-- Vue calendrier (mois) -->
-      <div class="panneau" id="vue-mois" hidden>
-        <div class="semaine-nav">
-          <button type="button" class="ghost" id="mois-prec" aria-label="Mois précédent">←</button>
-          <h2 id="mois-titre">Mois</h2>
-          <button type="button" class="ghost" id="mois-suiv" aria-label="Mois suivant">→</button>
-        </div>
-        <div class="calendrier card">
-          <div class="cal-grille cal-entete" aria-hidden="true">
-            <span>L</span><span>M</span><span>M</span><span>J</span><span>V</span><span>S</span><span>D</span>
-          </div>
-          <div class="cal-grille" id="cal-jours"></div>
-          <div class="cal-legende">
-            <span><i class="point fait"></i> Séance faite</span>
-            <span><i class="point prevu"></i> Prévue par le coach</span>
-            <span><i class="point manque"></i> Prévue, pas faite</span>
-          </div>
-        </div>
-        <h3 id="cal-titre-jour"></h3>
-        <div class="seances" id="cal-detail"></div>
-      </div>
+      <div class="panneau" id="vue-mois" hidden></div>
 
       <!-- Vue semaine -->
       <div class="panneau" id="vue-semaine">
@@ -773,9 +764,14 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
         <div id="records-contenu"></div>
       </section>
 
-      <section class="card" id="profil-stats">
-        <h3 id="titre-stats">Mes statistiques</h3>
-        <div class="tuiles-stats" id="stats-tuiles"><p class="muted">Chargement…</p></div>
+      <!-- Bilans : 7 derniers jours, 3 dernières semaines, depuis le début -->
+      <div class="panneau" id="profil-stats">
+        <div class="panneau" id="stats-tuiles"><p class="muted">Chargement…</p></div>
+      </div>
+
+      <section class="card" id="profil-calendrier">
+        <h3 id="titre-calendrier">Mon calendrier</h3>
+        <div id="profil-cal"></div>
       </section>
 
       <section class="card" id="profil-courbe">
@@ -964,6 +960,10 @@ const donnees = {
       posts.forEach((p) => { p.avec = autres.filter((x) => x.groupe_id === p.groupe_id).map((x) => x.athlete).filter(Boolean); });
     }
     return posts;
+  },
+  // Met à jour les copies d'une séance faite à plusieurs (tout sauf le ressenti personnel)
+  async majCompagnons(groupeId, champs) {
+    verifier(await sb.from("seances").update(champs).eq("groupe_id", groupeId).eq("principal", false));
   },
   async supprimerGroupe(groupeId) { verifier(await sb.from("seances").delete().eq("groupe_id", groupeId)); },
   async semaine(athleteId, debut, fin) {
@@ -1301,9 +1301,10 @@ const MODELES = {
     champs: [
       { id: "reps", label: "Nombre de côtes", defaut: 8 },
       { id: "duree", label: "Durée de chaque côte", temps: true, defaut: 30 },
+      { id: "recup", label: "Récup entre les côtes", temps: true, defaut: 90 },
     ],
     titre: (v) => "Côtes " + v.reps + " × " + enDuree(v.duree),
-    corps: (v) => v.reps + " × " + enDuree(v.duree) + " en côte, récupération en redescendant en trottinant",
+    corps: (v) => v.reps + " × " + enDuree(v.duree) + " en côte, récup " + enDuree(v.recup) + " en redescendant en trottinant",
   },
   vitesse: {
     nom: "Vitesse",
@@ -2023,7 +2024,9 @@ function carteFil(s) {
   carte.style.setProperty("--auteur", couleurDe(auteur));
   // On peut supprimer ses propres publications libres
   if (!s.coach_id && moi && auteur.id === moi.id) {
-    const b = el("button", { type: "button", class: "lien petit", style: "justify-self:start" }, "Supprimer ma publication");
+    const modifier = el("button", { type: "button", class: "lien petit" }, "Modifier");
+    modifier.addEventListener("click", () => ouvrirPublier(s));
+    const b = el("button", { type: "button", class: "lien petit" }, "Supprimer ma publication");
     b.addEventListener("click", async () => {
       try {
         // Une séance faite à plusieurs disparaît pour tout le monde
@@ -2032,7 +2035,7 @@ function carteFil(s) {
       }
       catch (e) { b.replaceWith(el("p", { class: "error" }, messageErreur(e))); }
     });
-    carte.append(b);
+    carte.append(el("div", { class: "actions" }, [modifier, b]));
   }
   carte.append(zoneReactions(s), zoneCommentaires(s));
   return carte;
@@ -2187,40 +2190,51 @@ let photoPublier = null;
 let modelePublier = null;
 let choixAvec = null;
 let effortPublier = null, formePublier = null, repsPublier = null;
-$("ouvrir-publier").addEventListener("click", () => {
+let pubEnModif = null; // la séance que je modifie (null = nouvelle publication)
+$("ouvrir-publier").addEventListener("click", () => ouvrirPublier(null));
+
+function ouvrirPublier(existante = null) {
+  pubEnModif = existante;
+  const s = existante || {};
   $("form-publier").reset();
-  $("pub-date").value = aujourdhui();
-  effortPublier = champsEffort("pub");
-  repsPublier = champsReps("pub-rep", 0);
-  formePublier = champsForme("pub");
+  $("pub-titre-form").textContent = existante ? "Modifier ma séance" : "Une séance faite de ton côté";
+  $("bouton-publier").textContent = existante ? "Enregistrer" : "Publier";
+  $("pub-date").value = existante ? (existante.date || "") : aujourdhui();
+  $("pub-commentaire").value = s.commentaire || "";
+  effortPublier = champsEffort("pub", s);
+  repsPublier = champsReps("pub-rep", nbRepsDe(s), s.reps_bpm);
+  formePublier = champsForme("pub", s);
   $("pub-effort").replaceChildren(effortPublier.bloc);
   $("pub-reps").replaceChildren(repsPublier.bloc);
   $("pub-forme").replaceChildren(formePublier.bloc);
   // Footing, sortie longue, renfo : la durée du modèle remplit la durée de la séance.
   // Seuil : une ligne de BPM par répétition.
   modelePublier = editeurModele("pub", {
-    typeInitial: lire("couloir-type-pub") || "footing",
+    typeInitial: existante ? existante.type : lire("couloir-type-pub") || "footing",
     surChangement: (type, v) => {
-      ecrire("couloir-type-pub", type);
+      if (!pubEnModif) ecrire("couloir-type-pub", type);
       const m = MODELES[type];
       effortPublier.proposerDuree(m.remplitDuree ? v.duree : null);
       repsPublier.maj(m.nbReps ? m.nbReps(v) : 0);
     },
   });
+  if (existante) modelePublier.charger(existante);
   $("pub-modele").replaceChildren(modelePublier.bloc);
+  // En modification, on ne change pas les personnes avec qui on a couru
+  $("pub-avec-bloc").hidden = !!existante;
   const autres = profilsConnus.filter((p) => p.id !== moi.id);
   choixAvec = choixPersonnes("avec", autres);
   $("pub-avec").replaceChildren(autres.length ? choixAvec.bloc : el("p", { class: "muted petit" }, "Personne d'autre n'est encore inscrit."));
-  ressentiPublier = choixRessenti("pub-rpe", null);
-  photoPublier = champPhoto("pub-image", null);
+  ressentiPublier = choixRessenti("pub-rpe", s.ressenti || null);
+  photoPublier = champPhoto("pub-image", s.photo_url || null);
   $("pub-photo").replaceChildren(photoPublier.bloc);
   $("pub-ressenti").replaceChildren(ressentiPublier);
   afficherMessage("erreur-publier", "");
   $("form-publier").hidden = false;
   $("ouvrir-publier").hidden = true;
   $("form-publier").scrollIntoView({ behavior: "smooth", block: "start" });
-});
-function fermerPublier() { $("form-publier").hidden = true; $("ouvrir-publier").hidden = false; }
+}
+function fermerPublier() { pubEnModif = null; $("form-publier").hidden = true; $("ouvrir-publier").hidden = false; }
 $("annuler-publier").addEventListener("click", fermerPublier);
 
 $("form-publier").addEventListener("submit", async (event) => {
@@ -2231,6 +2245,24 @@ $("form-publier").addEventListener("submit", async (event) => {
     const effort = effortPublier.lire();
     const forme = formePublier.lire();
     const reps_bpm = repsPublier.lire();
+    // Modification d'une séance déjà publiée
+    if (pubEnModif) {
+      const enModif = pubEnModif;
+      await pendant($("bouton-publier"), "Enregistrement…", async () => {
+        const commun = { type, parametres, date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null, ...effort };
+        await donnees.majSeance(enModif.id, {
+          ...commun,
+          ressenti: ressentiPublier.valeur(), commentaire: $("pub-commentaire").value.trim() || null,
+          ...forme, reps_bpm,
+          photo_url: await photoPublier.url(moi.id),
+        });
+        // Les personnes avec qui j'ai couru voient aussi la séance corrigée
+        if (enModif.groupe_id) await donnees.majCompagnons(enModif.groupe_id, commun);
+      });
+      fermerPublier();
+      chargerFil(true);
+      return;
+    }
     const avec = choixAvec ? choixAvec.valeurs() : [];
     await pendant($("bouton-publier"), "Publication…", async () => {
       const commun = {
@@ -2441,17 +2473,18 @@ function carteSemaine(s, surChangement = () => {}) {
   return carte;
 }
 
-/* ---------- Vue calendrier (mois) ---------- */
+/* ---------- Vue calendrier (mois) dans l'onglet Semaine ---------- */
 let vueSemaine = lire("couloir-vue") === "mois" ? "mois" : "semaine";
-let decalageMois = 0;
-let jourChoisi = null;      // « 2026-11-04 »
-let seancesCal = [];
 
 function afficherVue() {
   document.querySelectorAll("#vue-choix button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.vue === vueSemaine)));
   $("vue-semaine").hidden = vueSemaine !== "semaine";
   $("vue-mois").hidden = vueSemaine !== "mois";
-  if (vueSemaine === "mois") chargerCalendrier(); else chargerSemaine();
+  if (vueSemaine === "mois") {
+    const cal = calendrier(moi, { interactif: true });
+    $("vue-mois").replaceChildren(cal.bloc);
+    cal.charger();
+  } else chargerSemaine();
 }
 document.querySelectorAll("#vue-choix button").forEach((b) => b.addEventListener("click", () => {
   vueSemaine = b.dataset.vue;
@@ -2468,90 +2501,227 @@ function etatCal(s, aujourdhuiIso) {
   if (s.fait) return "fait";
   return s.date < aujourdhuiIso ? "manque" : "prevu";
 }
-
-async function chargerCalendrier() {
-  const premier = new Date(new Date().getFullYear(), new Date().getMonth() + decalageMois, 1);
-  const titre = premier.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
-  $("mois-titre").textContent = titre.charAt(0).toUpperCase() + titre.slice(1);
-  $("cal-jours").replaceChildren(el("p", { class: "muted", style: "grid-column: 1 / -1" }, "Chargement…"));
-  try {
-    seancesCal = await donnees.toutesMesSeances(moi.id);
-  } catch (e) {
-    $("cal-jours").replaceChildren(el("p", { class: "error", style: "grid-column: 1 / -1" }, messageErreur(e)));
-    return;
-  }
-  // Par défaut : aujourd'hui si on regarde le mois en cours
-  const auj = aujourdhui();
-  if (!jourChoisi || jourChoisi.slice(0, 7) !== isoLocal(premier).slice(0, 7)) {
-    jourChoisi = auj.slice(0, 7) === isoLocal(premier).slice(0, 7) ? auj : null;
-  }
-  dessinerCalendrier();
+function decalerIso(iso, jours) { const d = dateLocale(iso); d.setDate(d.getDate() + jours); return isoLocal(d); }
+function nbJoursEntre(debut, fin) { return Math.round((dateLocale(fin) - dateLocale(debut)) / 86400000) + 1; }
+function periodeEnTexte(debut, fin) {
+  const jm = { day: "numeric", month: "long" };
+  if (debut === fin) return "Le " + dateLocale(debut).toLocaleDateString("fr-FR", jm);
+  return "Du " + dateLocale(debut).toLocaleDateString("fr-FR", jm) + " au " + dateLocale(fin).toLocaleDateString("fr-FR", jm);
 }
 
-function dessinerCalendrier() {
-  const premier = new Date(new Date().getFullYear(), new Date().getMonth() + decalageMois, 1);
-  const moisIso = isoLocal(premier).slice(0, 7);
-  const auj = aujourdhui();
-  const parJour = {};
-  seancesCal.forEach((s) => { const j = jourCalendrier(s); if (j) (parJour[j] ||= []).push(s); });
-
-  // De lundi (avant le 1er) à dimanche (après le dernier jour du mois)
-  const debut = lundiDe(premier);
-  const dernier = new Date(premier.getFullYear(), premier.getMonth() + 1, 0);
-  const fin = lundiDe(dernier); fin.setDate(fin.getDate() + 6);
-  const cases = [];
-  for (const d = new Date(debut); d <= fin; d.setDate(d.getDate() + 1)) {
-    const iso = isoLocal(d);
-    const liste = parJour[iso] || [];
-    const etats = liste.map((s) => etatCal(s, auj));
-    const nb = (e) => etats.filter((x) => x === e).length;
-    const resume = [nb("fait") && pluriel(nb("fait"), "séance") + " faite" + (nb("fait") > 1 ? "s" : ""),
-      nb("prevu") && pluriel(nb("prevu"), "séance") + " prévue" + (nb("prevu") > 1 ? "s" : ""),
-      nb("manque") && pluriel(nb("manque"), "séance") + " pas faite" + (nb("manque") > 1 ? "s" : "")].filter(Boolean).join(", ");
-    const b = el("button", {
-      type: "button",
-      class: "jour" + (iso.slice(0, 7) !== moisIso ? " hors-mois" : "") + (iso === auj ? " aujourdhui" : "") + (iso === jourChoisi ? " choisi" : ""),
-      "aria-label": d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }) + (resume ? " : " + resume : ""),
-      "aria-pressed": String(iso === jourChoisi),
-    }, [
-      el("span", {}, String(d.getDate())),
-      el("span", { class: "points", "aria-hidden": "true" }, etats.slice(0, 3).map((e) => el("i", { class: "point " + e }))),
-    ]);
-    b.addEventListener("click", () => { jourChoisi = iso; dessinerCalendrier(); });
-    cases.push(b);
-  }
-  $("cal-jours").replaceChildren(...cases);
-  afficherJour(parJour[jourChoisi] || []);
+/* ---------- Bilan d'une période ---------- */
+function recapPeriode(seances, debut, fin) {
+  const dedans = (iso) => iso && iso >= debut && iso <= fin;
+  const faites = seances.filter((x) => x.fait && dedans(jourCalendrier(x)));
+  const prevues = seances.filter((x) => x.coach_id && dedans(x.date));
+  const moyenne = (liste) => (liste.length ? liste.reduce((t, v) => t + v, 0) / liste.length : null);
+  let km = 0, sec = 0, kmAllure = 0, secAllure = 0, maxKm = 0;
+  const types = {}, jours = new Set();
+  faites.forEach((x) => {
+    const d = Number(x.distance_km) || 0, t = dureeSec(x) || 0;
+    km += d; sec += t; maxKm = Math.max(maxKm, d);
+    if (d && t) { kmAllure += d; secAllure += t; }
+    const nom = (MODELES[x.type] || MODELES.libre).nom;
+    types[nom] = (types[nom] || 0) + 1;
+    jours.add(jourCalendrier(x));
+  });
+  return {
+    n: faites.length, km, sec, maxKm, types, jours: jours.size, nbJours: nbJoursEntre(debut, fin),
+    allure: allure(kmAllure, secAllure),
+    rpe: moyenne(faites.filter((x) => x.ressenti).map((x) => x.ressenti)),
+    forme: moyenne(faites.filter((x) => x.forme).map((x) => x.forme)),
+    bpm: moyenne(faites.filter((x) => x.bpm_moy).map((x) => x.bpm_moy)),
+    prevues: prevues.length, prevuesFaites: prevues.filter((x) => x.fait).length,
+  };
+}
+const arrondi1 = (n) => (Math.round(n * 10) / 10).toLocaleString("fr-FR");
+// Tuiles d'un bilan ; « extra » ajoute des tuiles (pour le bilan total)
+function tuilesRecap(r, extra = []) {
+  if (!r.n && !r.prevues) return [el("p", { class: "vide" }, "Aucune séance sur cette période.")];
+  const tuiles = [
+    [String(r.n), "séance" + (r.n > 1 ? "s" : "") + " faite" + (r.n > 1 ? "s" : "")],
+    [formatKm(r.km), "parcourus"],
+    [r.sec ? enDuree(r.sec) : "–", "d'entraînement"],
+    [r.allure || "–", "allure moyenne"],
+    [r.maxKm ? formatKm(r.maxKm) : "–", "plus longue sortie"],
+    [r.jours + " / " + r.nbJours, "jours avec une séance"],
+    [r.rpe ? arrondi1(r.rpe) + "/10" : "–", "difficulté moyenne"],
+    [r.forme ? arrondi1(r.forme) + "/5" : "–", "forme moyenne"],
+    [r.bpm ? Math.round(r.bpm) + " bpm" : "–", "BPM moyen"],
+    ...(r.prevues ? [[r.prevuesFaites + " / " + r.prevues, "séances du coach faites"]] : []),
+    ...extra,
+  ];
+  const types = Object.entries(r.types).sort((a, b) => b[1] - a[1]);
+  return [
+    el("div", { class: "tuiles-stats" }, tuiles.map(([chiffre, quoi]) =>
+      el("div", { class: "tuile-stat" }, [el("span", { class: "chiffre" }, chiffre), el("span", { class: "quoi" }, quoi)]))),
+    types.length ? el("div", { class: "etat" }, types.map(([nom, n]) => el("span", { class: "chip" }, n + " × " + nom))) : null,
+  ];
 }
 
-// Le détail du jour choisi, sous le calendrier
-function afficherJour(liste) {
-  const zone = $("cal-detail");
-  if (!jourChoisi) { $("cal-titre-jour").textContent = ""; zone.replaceChildren(el("p", { class: "muted" }, "Touche un jour pour voir ses séances.")); return; }
-  const t = formatDate(jourChoisi);
-  $("cal-titre-jour").textContent = t.charAt(0).toUpperCase() + t.slice(1);
-  if (!liste.length) { zone.replaceChildren(el("p", { class: "vide" }, "Aucune séance ce jour-là.")); return; }
-  const redessiner = () => dessinerCalendrier();
-  zone.replaceChildren(...liste.map((s) => {
-    // Séance du coach : on peut la cocher, donner son ressenti ou la retirer
-    if (s.coach_id) return carteSemaine(s, (quoi) => {
-      if (quoi === "retiree") seancesCal = seancesCal.filter((x) => x.id !== s.id);
-      redessiner();
+/* ---------- Composant calendrier (onglet Semaine et profils) ----------
+   interactif : on peut cocher / retirer les séances du coach depuis le détail du jour. */
+function calendrier(personne, { interactif = false, seances: donneesInitiales = null } = {}) {
+  const estMoi = !!moi && personne.id === moi.id;
+  let decalage = 0, jour = aujourdhui(), plage = null, choix = null; // choix : null, "debut" ou "fin"
+  let seances = donneesInitiales || [];
+
+  const titre = el("h3", { class: "cal-titre" });
+  const prec = el("button", { type: "button", class: "ghost compact", "aria-label": "Mois précédent" }, "←");
+  const suiv = el("button", { type: "button", class: "ghost compact", "aria-label": "Mois suivant" }, "→");
+  const boutonsPeriode = [7, 14, 21, 28].map((n) => {
+    const b = el("button", { type: "button", class: "ghost compact", "aria-pressed": "false" }, n + " j");
+    b.addEventListener("click", () => {
+      const fin = aujourdhui();
+      plage = { debut: decalerIso(fin, -(n - 1)), fin, n };
+      choix = null; decalage = 0;
+      dessiner();
     });
-    // Séance publiée de son côté : on affiche le détail
-    return el("article", { class: "seance faite" }, [
-      enTeteSeance(s),
-      s.titre ? el("p", { class: "seance-titre" }, s.titre) : null,
-      s.contenu ? el("p", { class: "seance-contenu" }, s.contenu) : null,
-      etatEffort(s, [el("span", { class: "pill faite" }, s.principal === false ? "✓ Faite à plusieurs" : "✓ Publiée")]),
-      photoDeSeance(s),
-      s.commentaire ? el("blockquote", { class: "commentaire" }, s.commentaire) : null,
-    ]);
-  }));
+    return b;
+  });
+  const boutonChoisir = el("button", { type: "button", class: "ghost compact", "aria-pressed": "false" }, "Choisir les jours");
+  boutonChoisir.addEventListener("click", () => {
+    choix = choix ? null : "debut";
+    if (choix) plage = null;
+    dessiner();
+  });
+  const aide = el("p", { class: "aide-cal", hidden: "" });
+  const jours = el("div", { class: "cal-grille" });
+  const bas = el("div", { class: "panneau" });
+  const bloc = el("div", { class: "panneau cal-composant" }, [
+    el("div", { class: "semaine-nav" }, [prec, titre, suiv]),
+    el("div", { class: "periodes" }, [el("span", { class: "label" }, "Bilan sur"), ...boutonsPeriode, boutonChoisir]),
+    aide,
+    el("div", { class: "calendrier" }, [
+      el("div", { class: "cal-grille cal-entete", "aria-hidden": "true" }, ["L", "M", "M", "J", "V", "S", "D"].map((j) => el("span", {}, j))),
+      jours,
+      el("div", { class: "cal-legende" }, [
+        el("span", {}, [el("i", { class: "point fait" }), " Séance faite"]),
+        el("span", {}, [el("i", { class: "point prevu" }), " Prévue par le coach"]),
+        el("span", {}, [el("i", { class: "point manque" }), " Prévue, pas faite"]),
+      ]),
+    ]),
+    bas,
+  ]);
+  prec.addEventListener("click", () => { decalage--; dessiner(); });
+  suiv.addEventListener("click", () => { decalage++; dessiner(); });
+
+  function clicJour(iso) {
+    if (choix === "debut") { plage = { debut: iso, fin: iso }; choix = "fin"; }
+    else if (choix === "fin") {
+      plage = iso < plage.debut ? { debut: iso, fin: plage.debut } : { debut: plage.debut, fin: iso };
+      choix = null;
+    } else { plage = null; jour = iso; }
+    dessiner();
+  }
+
+  function dessiner() {
+    const premier = new Date(new Date().getFullYear(), new Date().getMonth() + decalage, 1);
+    const moisIso = isoLocal(premier).slice(0, 7);
+    const t = premier.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+    titre.textContent = t.charAt(0).toUpperCase() + t.slice(1);
+    boutonsPeriode.forEach((b, i) => b.setAttribute("aria-pressed", String(!!plage && plage.n === [7, 14, 21, 28][i] && plage.fin === aujourdhui())));
+    boutonChoisir.setAttribute("aria-pressed", String(!!choix));
+    aide.hidden = !choix;
+    aide.textContent = choix === "debut" ? "Touche le premier jour de la période." : "Touche maintenant le dernier jour.";
+
+    const auj = aujourdhui();
+    const parJour = {};
+    seances.forEach((x) => { const j = jourCalendrier(x); if (j) (parJour[j] ||= []).push(x); });
+    const debut = lundiDe(premier);
+    const dernier = new Date(premier.getFullYear(), premier.getMonth() + 1, 0);
+    const fin = lundiDe(dernier); fin.setDate(fin.getDate() + 6);
+    const cases = [];
+    for (const d = new Date(debut); d <= fin; d.setDate(d.getDate() + 1)) {
+      const iso = isoLocal(d);
+      const etats = (parJour[iso] || []).map((x) => etatCal(x, auj));
+      const nb = (e) => etats.filter((x) => x === e).length;
+      const resume = [nb("fait") && nb("fait") + " faite" + (nb("fait") > 1 ? "s" : ""),
+        nb("prevu") && nb("prevu") + " prévue" + (nb("prevu") > 1 ? "s" : ""),
+        nb("manque") && nb("manque") + " pas faite" + (nb("manque") > 1 ? "s" : "")].filter(Boolean).join(", ");
+      const dansPlage = plage && iso >= plage.debut && iso <= (plage.fin || plage.debut);
+      const choisi = !plage && !choix && iso === jour;
+      const b = el("button", {
+        type: "button",
+        class: "jour" + (iso.slice(0, 7) !== moisIso ? " hors-mois" : "") + (iso === auj ? " aujourdhui" : "")
+          + (choisi ? " choisi" : "") + (dansPlage ? " plage" : "") + (plage && (iso === plage.debut || iso === plage.fin) ? " plage-bout" : ""),
+        "aria-label": d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" }) + (resume ? " : " + resume : ""),
+        "aria-pressed": String(choisi || !!dansPlage),
+      }, [
+        el("span", {}, String(d.getDate())),
+        el("span", { class: "points", "aria-hidden": "true" }, etats.slice(0, 3).map((e) => el("i", { class: "point " + e }))),
+      ]);
+      b.addEventListener("click", () => clicJour(iso));
+      cases.push(b);
+    }
+    jours.replaceChildren(...cases);
+    if (plage && plage.fin && !choix) afficherBilan();
+    else if (!choix) afficherJour(parJour[jour] || []);
+    else bas.replaceChildren();
+  }
+
+  function afficherBilan() {
+    const r = recapPeriode(seances, plage.debut, plage.fin);
+    const effacer = el("button", { type: "button", class: "lien petit" }, "Effacer la période");
+    effacer.addEventListener("click", () => { plage = null; dessiner(); });
+    bas.replaceChildren(el("div", { class: "bilan" }, [
+      el("div", { class: "entete-panneau" }, [el("h3", {}, "Bilan de la période"), effacer]),
+      el("p", { class: "muted petit" }, periodeEnTexte(plage.debut, plage.fin) + " · " + pluriel(r.nbJours, "jour")),
+      ...tuilesRecap(r),
+    ]));
+  }
+
+  function afficherJour(liste) {
+    const t = formatDate(jour);
+    const tete = el("h3", {}, t.charAt(0).toUpperCase() + t.slice(1));
+    if (!liste.length) { bas.replaceChildren(tete, el("p", { class: "vide" }, "Aucune séance ce jour-là.")); return; }
+    bas.replaceChildren(tete, el("div", { class: "seances" }, liste.map((x) => {
+      // Mes séances du coach : on peut les cocher ou les retirer d'ici
+      if (interactif && estMoi && x.coach_id) {
+        return carteSemaine(x, (quoi) => {
+          if (quoi === "retiree") seances = seances.filter((y) => y.id !== x.id);
+          dessiner();
+        });
+      }
+      return carteLecture(x, estMoi);
+    })));
+  }
+
+  return {
+    bloc,
+    async charger() {
+      if (!donneesInitiales) {
+        jours.replaceChildren(el("p", { class: "muted", style: "grid-column: 1 / -1" }, "Chargement…"));
+        try { seances = await donnees.toutesMesSeances(personne.id); }
+        catch (e) { jours.replaceChildren(el("p", { class: "error", style: "grid-column: 1 / -1" }, messageErreur(e))); return; }
+      }
+      dessiner();
+    },
+  };
 }
 
-$("mois-prec").addEventListener("click", () => { decalageMois--; jourChoisi = null; chargerCalendrier(); });
-$("mois-suiv").addEventListener("click", () => { decalageMois++; jourChoisi = null; chargerCalendrier(); });
+// Une séance affichée sans action (profil, calendrier) ; mes publications ont un bouton « Modifier »
+function carteLecture(x, estMoi) {
+  const proposee = x.coach_id ? el("p", { class: "muted petit" }, x.coach_id === x.athlete_id ? "Séance fixée par soi-même" : "Proposée par " + nomComplet(x.coach)) : null;
+  const carte = el("article", { class: "seance" + (x.fait ? " faite" : "") }, [
+    enTeteSeance(x),
+    x.titre ? el("p", { class: "seance-titre" }, x.titre) : null,
+    x.contenu ? el("p", { class: "seance-contenu" }, x.contenu) : null,
+    blocConsignes(x),
+    proposee,
+    x.fait
+      ? etatEffort(x, [el("span", { class: "pill faite" }, x.principal === false ? "✓ Faite à plusieurs" : "✓ Faite")])
+      : el("div", { class: "etat" }, el("span", { class: "pill" }, "À faire")),
+    x.fait ? photoDeSeance(x) : null,
+    x.fait && x.commentaire ? el("blockquote", { class: "commentaire" }, x.commentaire) : null,
+  ]);
+  if (estMoi && !x.coach_id && x.principal !== false) {
+    const modifier = el("button", { type: "button", class: "lien petit", style: "justify-self:start" }, "Modifier ma séance");
+    modifier.addEventListener("click", () => { aller("fil"); ouvrirPublier(x); });
+    carte.append(modifier);
+  }
+  return carte;
+}
 
 $("sem-prec").addEventListener("click", () => { decalageSemaine--; chargerSemaine(); });
 $("sem-suiv").addEventListener("click", () => { decalageSemaine++; chargerSemaine(); });
@@ -3169,7 +3339,7 @@ async function afficherProfil() {
   if (estMoi) $("panneau-profil").style.removeProperty("--track");
   else $("panneau-profil").style.setProperty("--track", couleurDe(p));
   $("profil-modifier").hidden = !estMoi;
-  $("titre-stats").textContent = estMoi ? "Mes statistiques" : "Statistiques " + de(p.prenom);
+  $("titre-calendrier").textContent = estMoi ? "Mon calendrier" : "Calendrier " + de(p.prenom);
   $("titre-courbe").textContent = estMoi ? "Mon évolution" : "Évolution " + de(p.prenom);
 
   $("profil-form").hidden = true;
@@ -3182,6 +3352,8 @@ async function afficherProfil() {
   desc.classList.toggle("muted", !p.description);
   $("profil-stats").hidden = false;
   $("profil-courbe").hidden = false;
+  $("profil-calendrier").hidden = false;
+  $("profil-cal").replaceChildren(el("p", { class: "muted" }, "Chargement…"));
   $("mes-trophees").replaceChildren();
 
   // Records
@@ -3203,19 +3375,45 @@ async function afficherProfil() {
   $("courbe").replaceChildren();
 
   try {
-    const groupe = await chargerGroupe();
+    const [groupe, seancesPerso] = await Promise.all([chargerGroupe(), donnees.toutesMesSeances(p.id)]);
     if (onglet !== "profil" || (profilVu || moi).id !== p.id) return; // on a changé de profil entre-temps
     const { stats } = calculerStats(groupe);
-    const st = stats.find((x) => x.profil.id === p.id) || statsPersonne([]);
-    afficherTuilesStats(st, estMoi);
+    const st = statsPersonne(seancesPerso.filter((x) => x.fait));
+    afficherBilans(seancesPerso, st, estMoi);
     statsCourbe = st;
     dessinerCourbe();
     afficherMesTrophees(stats, p);
+    const cal = calendrier(p, { seances: seancesPerso });
+    $("profil-cal").replaceChildren(cal.bloc);
+    cal.charger();
     const barres = barresObjectifs(p, st.w);
     if (barres) $("objectifs-contenu").replaceChildren(...barres);
   } catch (e) {
     $("stats-tuiles").replaceChildren(el("p", { class: "error" }, messageErreur(e)));
   }
+}
+
+// Trois bilans séparés : 7 derniers jours, 3 dernières semaines, depuis le début
+function afficherBilans(seancesPerso, st, estMoi) {
+  const auj = aujourdhui();
+  const carte = (titre, sousTitre, contenu) => el("section", { class: "card" }, [
+    el("div", {}, [el("h3", {}, titre), el("p", { class: "muted petit" }, sousTitre)]), ...contenu,
+  ]);
+  const d7 = decalerIso(auj, -6), d21 = decalerIso(auj, -20);
+  const premiere = seancesPerso.filter((x) => x.fait).map(jourCalendrier).filter(Boolean).sort()[0] || auj;
+  const total = recapPeriode(seancesPerso, "0000-01-01", "9999-12-31");
+  total.nbJours = nbJoursEntre(premiere, auj);
+  const ma = estMoi ? "ma " : "";
+  $("stats-tuiles").replaceChildren(
+    carte("Les 7 derniers jours", periodeEnTexte(d7, auj), tuilesRecap(recapPeriode(seancesPerso, d7, auj))),
+    carte("Les 3 dernières semaines", periodeEnTexte(d21, auj), tuilesRecap(recapPeriode(seancesPerso, d21, auj))),
+    carte("Depuis le début", "Depuis le " + dateLocale(premiere).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }), tuilesRecap(total, [
+      [arrondi1(st.seancesParSemaine), "séances par semaine en moyenne"],
+      [formatKm(st.kmParSemaine), "par semaine en moyenne"],
+      [st.maxSemaineKm ? formatKm(st.maxSemaineKm) : "–", ma + "plus grosse semaine"],
+      [String(st.serieActuelle), "semaine" + (st.serieActuelle > 1 ? "s" : "") + " d'affilée en ce moment"],
+    ])),
+  );
 }
 
 function afficherTuilesStats(st, estMoi = true) {
@@ -3273,7 +3471,7 @@ $("profil-modifier").addEventListener("click", () => {
   $("pf-records").replaceChildren(...(Array.isArray(moi.records) ? moi.records : []).map((r) => ligneRecord(r)));
   majCompteur();
   afficherMessage("erreur-pf", "");
-  ["profil-vue", "profil-stats", "profil-courbe", "profil-objectifs", "profil-records"].forEach((id) => ($(id).hidden = true));
+  ["profil-vue", "profil-stats", "profil-courbe", "profil-objectifs", "profil-records", "profil-calendrier"].forEach((id) => ($(id).hidden = true));
   $("profil-form").hidden = false;
   window.scrollTo(0, 0);
 });
