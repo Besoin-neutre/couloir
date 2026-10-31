@@ -500,6 +500,16 @@ details.anciennes .versions { gap: 10px; }
 .gif-apercu img, .com-gif { max-width: 220px; max-height: 220px; border-radius: 8px; display: block; }
 .com-gif { cursor: zoom-in; margin-top: 4px; }
 
+/* Notifications et espace utilisé */
+.notifs { display: grid; gap: 10px; }
+.etat-notifs { margin: 0; }
+.notifs-choix { display: grid; gap: 4px; }
+.notifs-choix #notifs-types { display: grid; gap: 10px; }
+.notifs-choix .option { align-items: flex-start; }
+.notifs-choix .option input { flex: none; margin-top: 2px; }
+.espace.attention .barre span { background: var(--moyen); }
+.espace.plein .barre span { background: var(--erreur); }
+
 /* Prénoms cliquables */
 button.personne { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-align: left; border-radius: 4px; }
 button.personne:hover b, button.personne:focus-visible b { text-decoration: underline; text-underline-offset: 3px; }
@@ -835,6 +845,22 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
         <div id="records-contenu"></div>
       </section>
 
+      <!-- Seulement dans son propre profil -->
+      <section class="card" id="profil-notifs" hidden>
+        <h3>Mes notifications</h3>
+        <div class="notifs" id="notifs-appareil"></div>
+        <fieldset class="notifs-choix">
+          <legend class="label">Ce que je veux recevoir</legend>
+          <div id="notifs-types"></div>
+          <p class="aide">Ces choix valent pour tous les téléphones où tu as activé les notifications.</p>
+        </fieldset>
+      </section>
+
+      <section class="card" id="profil-espace" hidden>
+        <h3>Espace utilisé (offre gratuite)</h3>
+        <div class="objectifs" id="espace-contenu"></div>
+      </section>
+
       <!-- Bilans : 7 derniers jours, 3 dernières semaines, depuis le début -->
       <div class="panneau" id="profil-stats">
         <div class="panneau" id="stats-tuiles"><p class="muted">Chargement…</p></div>
@@ -972,7 +998,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
    ========================================================= */
 function verifier({ data, error }) { if (error) throw error; return data; }
 
-const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url, couleur, objectif_km, objectif_seances, records";
+const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url, couleur, objectif_km, objectif_seances, records, notifs";
 const CHAMPS_SEANCE = "id, cree_le, date, type, parametres, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, duree_s, forme, bpm_moy, bpm_max, reps_bpm, vo2max, photos, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
 const CHAMPS_COMMENTAIRE = "id, texte, gif_url, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url, couleur)";
 const CHAMPS_FIL = CHAMPS_SEANCE
@@ -1019,11 +1045,29 @@ const donnees = {
     return count || 0;
   },
   // Photo de profil : rangée dans le dossier « photos » de Supabase
+  // Photo de séance : la photo (1 280 px) + une miniature légère (400 px) pour le fil
   async envoyerPhotoSeance(profilId, blob) {
-    const chemin = profilId + "/seances/" + Date.now() + ".jpg";
-    verifier(await sb.storage.from("photos").upload(chemin, blob, { contentType: "image/jpeg" }));
-    return sb.storage.from("photos").getPublicUrl(chemin).data.publicUrl;
+    const base = profilId + "/seances/" + Date.now() + "-" + Math.random().toString(36).slice(2, 6);
+    verifier(await sb.storage.from("photos").upload(base + ".jpg", blob, { contentType: "image/jpeg" }));
+    try {
+      const mini = await preparerImage(blob, 400);
+      await sb.storage.from("photos").upload(base + "-mini.jpg", mini, { contentType: "image/jpeg" });
+    } catch (e) { /* sans miniature, le fil affichera la photo entière */ }
+    return sb.storage.from("photos").getPublicUrl(base + ".jpg").data.publicUrl;
   },
+  // Notifications : l'abonnement d'un téléphone, rattaché à un profil
+  async sauverAbonnement(profilId, abo) {
+    const j = abo.toJSON();
+    verifier(await sb.from("abonnements_push").upsert(
+      { endpoint: j.endpoint, profil_id: profilId, p256dh: j.keys.p256dh, auth: j.keys.auth }, { onConflict: "endpoint" }));
+  },
+  async profilDeLAbonnement(endpoint) {
+    const r = verifier(await sb.from("abonnements_push").select("profil_id").eq("endpoint", endpoint).maybeSingle());
+    return r ? r.profil_id : null;
+  },
+  async supprimerAbonnement(endpoint) { verifier(await sb.from("abonnements_push").delete().eq("endpoint", endpoint)); },
+  // Place occupée dans Supabase
+  async utilisation() { return verifier(await sb.rpc("utilisation")); },
   async envoyerPhoto(profilId, blob) {
     const chemin = profilId + "/" + Date.now() + ".jpg";
     verifier(await sb.storage.from("photos").upload(chemin, blob, { contentType: "image/jpeg" }));
@@ -1778,7 +1822,7 @@ function champPhotos(prefixe, existantes = []) {
         elements.splice(i, 1);
         afficher();
       });
-      return el("div", { class: "vignette" }, [el("img", { src: e.apercu, alt: "Photo " + (i + 1) }), retirer]);
+      return el("div", { class: "vignette" }, [e.blob ? el("img", { src: e.apercu, alt: "Photo " + (i + 1) }) : imageMiniature(e.url, "Photo " + (i + 1)), retirer]);
     }));
     grille.hidden = !elements.length;
     bouton.hidden = elements.length >= MAX_PHOTOS;
@@ -1815,6 +1859,16 @@ async function champsDesPhotos(choix, profilId) {
   return { photos: photos.length ? photos : null, photo_url: photos[0] || null };
 }
 
+// Adresse de la miniature d'une photo (les anciennes photos n'en ont pas : on retombe sur la photo entière)
+function miniDe(src) {
+  return /\/photos\/[^?]*\/seances\/[^/?]+\.jpg$/.test(src) && !/-mini\.jpg$/.test(src) ? src.replace(/\.jpg$/, "-mini.jpg") : src;
+}
+function imageMiniature(src, alt) {
+  const img = el("img", { src: miniDe(src), alt, loading: "lazy" });
+  img.addEventListener("error", () => { if (img.getAttribute("src") !== src) img.src = src; });
+  return img;
+}
+
 // Petites vignettes ; un clic les ouvre en grand, avec des flèches pour passer de l'une à l'autre
 function photoDeSeance(s, auteur) {
   const liste = photosDe(s);
@@ -1822,7 +1876,7 @@ function photoDeSeance(s, auteur) {
   const alt = "Photo de la séance" + (auteur ? " " + de(nomComplet(auteur)) : "");
   return el("div", { class: "galerie" }, liste.map((src, i) => {
     const b = el("button", { type: "button", class: "photo-seance", "aria-label": "Agrandir la photo " + (i + 1) + " sur " + liste.length },
-      el("img", { src, alt: alt + " (" + (i + 1) + ")", loading: "lazy" }));
+      imageMiniature(src, alt + " (" + (i + 1) + ")"));
     b.addEventListener("click", () => ouvrirVisionneuse(liste, i, alt));
     return b;
   }));
@@ -2022,6 +2076,12 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "2.0", nom: "Ding !", date: "31 octobre 2026", nouveautes: [
+    "Les notifications arrivent sur le téléphone : séance du coach, séance à valider, commentaires, réactions (et, pour le coach, quand un athlète fait sa séance).",
+    "Chacun choisit dans son profil les notifications qu'il veut recevoir.",
+    "Le fil se charge plus vite : les photos s'affichent d'abord en miniatures légères.",
+    "Un compteur dans le profil montre la place utilisée dans l'offre gratuite.",
+  ] },
   { num: "1.9", nom: "Photos, GIF et cœurs qui chavirent", date: "31 octobre 2026", nouveautes: [
     "Plusieurs photos par séance (jusqu'à 6), à faire défiler en grand.",
     "Des GIF dans les commentaires : depuis son téléphone ou avec un lien Giphy.",
@@ -3845,6 +3905,8 @@ async function afficherProfil() {
   $("profil-stats").hidden = false;
   $("profil-courbe").hidden = false;
   $("profil-calendrier").hidden = false;
+  $("profil-notifs").hidden = true;
+  $("profil-espace").hidden = true;
   $("profil-cal").replaceChildren(el("p", { class: "muted" }, "Chargement…"));
   $("mes-trophees").replaceChildren();
 
@@ -3880,6 +3942,7 @@ async function afficherProfil() {
     cal.charger();
     const barres = barresObjectifs(p, st.w);
     if (barres) $("objectifs-contenu").replaceChildren(...barres);
+    if (estMoi) { $("profil-notifs").hidden = false; afficherNotifs(); afficherEspace(); }
   } catch (e) {
     $("stats-tuiles").replaceChildren(el("p", { class: "error" }, messageErreur(e)));
   }
@@ -3945,6 +4008,121 @@ function afficherMesTrophees(stats, p = moi) {
   }));
 }
 
+/* ---------- Notifications ---------- */
+const VAPID_PUBLIQUE = "BB5sEDvrFzhgtxNxa1XJ37gHIQGfg0zpKkWDPamN6QP0uT1D9xrZ0PChi1PDFky0mJqE9Sx7EkDFyTVgMVrhGvE";
+const TYPES_NOTIFS = [
+  { cle: "seance_coach", nom: "Quand le coach m'envoie une séance" },
+  { cle: "proposition", nom: "Quand quelqu'un a couru avec moi (séance à valider)" },
+  { cle: "commentaire", nom: "Quand on commente mes séances" },
+  { cle: "reaction", nom: "Quand on réagit à mes séances (👏 🔥 💪)" },
+  { cle: "seance_faite", nom: "Quand un athlète fait une séance que je lui ai donnée", coach: true },
+];
+let enregistrementSW = null;
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("sw.js").then((r) => { enregistrementSW = r; }).catch(() => {});
+}
+function pushPossible() { return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
+function appliInstallee() { return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true; }
+function cleVersOctets(b64) {
+  const brut = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(brut, (c) => c.charCodeAt(0));
+}
+async function enregistrement() {
+  if (enregistrementSW) return enregistrementSW;
+  enregistrementSW = await navigator.serviceWorker.register("sw.js");
+  return enregistrementSW;
+}
+
+async function afficherNotifs() {
+  const zone = $("notifs-appareil");
+  const etat = el("p", { class: "etat-notifs" });
+  const actions = el("div", { class: "actions" });
+  const erreur = el("p", { class: "error", hidden: "" });
+  zone.replaceChildren(etat, actions, erreur);
+  const signaler = (e) => { erreur.textContent = typeof e === "string" ? e : messageErreur(e); erreur.hidden = false; };
+  const bouton = (texte, classe, action) => {
+    const b = el("button", { type: "button", class: classe }, texte);
+    b.addEventListener("click", async () => { erreur.hidden = true; try { await pendant(b, "Un instant…", action); } catch (e) { signaler(e); } afficherNotifs(); });
+    return b;
+  };
+
+  if (!pushPossible()) {
+    const iPhone = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    etat.textContent = iPhone && !appliInstallee()
+      ? "Pour recevoir des notifications sur iPhone, ajoute d'abord l'appli à ton écran d'accueil (dans Safari : Partager, puis « Sur l'écran d'accueil »), puis ouvre-la depuis son icône."
+      : "Ce navigateur ne peut pas recevoir de notifications. Sur iPhone, ouvre l'appli depuis son icône sur l'écran d'accueil.";
+  } else if (Notification.permission === "denied") {
+    etat.textContent = "Les notifications sont bloquées sur ce téléphone. Pour les réautoriser : Réglages › Notifications › Athlé.";
+  } else {
+    let abo = null, proprietaire = null;
+    try {
+      const reg = await enregistrement();
+      abo = await reg.pushManager.getSubscription();
+      if (abo) proprietaire = await donnees.profilDeLAbonnement(abo.endpoint);
+    } catch (e) { signaler(e); }
+    if (abo && proprietaire === moi.id) {
+      etat.replaceChildren(el("span", { class: "pill faite" }, "✓ Activées sur ce téléphone"));
+      actions.append(bouton("Désactiver sur ce téléphone", "ghost", async () => {
+        await donnees.supprimerAbonnement(abo.endpoint);
+        await abo.unsubscribe();
+      }));
+    } else {
+      etat.textContent = abo && proprietaire
+        ? "Ce téléphone reçoit déjà les notifications d'un autre profil. Tu peux les recevoir pour toi à la place."
+        : "Reçois une notification dès qu'il se passe quelque chose pour toi.";
+      actions.append(bouton(abo && proprietaire ? "Les recevoir pour moi" : "Activer sur ce téléphone", "", async () => {
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") throw erreurLisible("Tu n'as pas autorisé les notifications. Tu peux réessayer, ou les autoriser dans Réglages › Notifications › Athlé.");
+        const reg = await enregistrement();
+        await navigator.serviceWorker.ready;
+        let a = await reg.pushManager.getSubscription();
+        if (!a) a = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: cleVersOctets(VAPID_PUBLIQUE) });
+        await donnees.sauverAbonnement(moi.id, a);
+      }));
+    }
+  }
+
+  // Le choix des types de notifications
+  const choix = moi.notifs || {};
+  $("notifs-types").replaceChildren(...TYPES_NOTIFS.filter((t) => !t.coach || moi.role === "Coach").map((t) => {
+    const id = "notif-" + t.cle;
+    const case_ = el("input", { type: "checkbox", id });
+    case_.checked = choix[t.cle] !== false;
+    case_.addEventListener("change", async () => {
+      const nouveaux = { ...(moi.notifs || {}), [t.cle]: case_.checked };
+      try {
+        await donnees.modifierProfil(moi.id, { notifs: nouveaux });
+        moi.notifs = nouveaux;
+        memoriserProfil(moi);
+      } catch (e) { case_.checked = !case_.checked; signaler(e); }
+    });
+    return el("label", { class: "option", for: id }, [case_, t.nom]);
+  }));
+}
+
+/* ---------- Espace utilisé (offre gratuite de Supabase) ---------- */
+function barreEspace(nom, utilise, limite) {
+  const pct = Math.min(100, Math.round((utilise / limite) * 100));
+  const enMo = (o) => (o >= 1e9 ? (o / 1e9).toLocaleString("fr-FR", { maximumFractionDigits: 2 }) + " Go" : Math.round(o / 1e6).toLocaleString("fr-FR") + " Mo");
+  const barre = el("span");
+  barre.style.width = Math.max(pct, 1) + "%";
+  return el("div", { class: "objectif espace " + (pct >= 90 ? "plein" : pct >= 70 ? "attention" : "") }, [
+    el("div", { class: "objectif-ligne" }, [el("b", {}, nom), el("span", { class: "objectif-chiffres" }, [el("strong", {}, enMo(utilise)), " / " + enMo(limite) + " (" + pct + " %)"])]),
+    el("div", { class: "barre", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100", "aria-valuenow": String(pct), "aria-label": nom + " : " + pct + " %" }, barre),
+  ]);
+}
+async function afficherEspace() {
+  try {
+    const u = await donnees.utilisation();
+    $("espace-contenu").replaceChildren(
+      barreEspace("Photos et GIF", Number(u.fichiers) || 0, 1e9),
+      barreEspace("Séances et textes", Number(u.base) || 0, 5e8),
+      el("p", { class: "aide" }, "Au-delà, l'offre payante de Supabase coûte 25 $ par mois. On peut aussi supprimer de vieilles photos."),
+    );
+    $("profil-espace").hidden = false;
+  } catch (e) { $("profil-espace").hidden = true; }
+}
+
 let lireCouleurPf = null;
 function majCompteur() { $("pf-compteur").textContent = $("pf-description").value.length + " / 300"; }
 
@@ -3963,7 +4141,7 @@ $("profil-modifier").addEventListener("click", () => {
   $("pf-records").replaceChildren(...(Array.isArray(moi.records) ? moi.records : []).map((r) => ligneRecord(r)));
   majCompteur();
   afficherMessage("erreur-pf", "");
-  ["profil-vue", "profil-stats", "profil-courbe", "profil-objectifs", "profil-records", "profil-calendrier"].forEach((id) => ($(id).hidden = true));
+  ["profil-vue", "profil-stats", "profil-courbe", "profil-objectifs", "profil-records", "profil-calendrier", "profil-notifs", "profil-espace"].forEach((id) => ($(id).hidden = true));
   $("profil-form").hidden = false;
   window.scrollTo(0, 0);
 });
