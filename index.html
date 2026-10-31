@@ -434,6 +434,36 @@ button.cocher:hover .case { background: var(--ok); }
 .reps-table th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .chip.coeur { border-color: color-mix(in srgb, var(--erreur) 45%, var(--line)); }
 
+/* Fenêtre « Quoi de neuf ? » */
+.modale-fond {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  background: rgba(10, 14, 18, .55);
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+.modale {
+  position: relative; width: 100%; max-width: 520px; max-height: 100%; overflow-y: auto;
+  background: var(--surface); color: var(--ink); border-radius: 14px; border: 1px solid var(--line);
+  padding: 24px 20px 20px; display: grid; gap: 14px; box-shadow: 0 20px 50px rgba(0, 0, 0, .3);
+}
+.modale h2 { font-size: 34px; }
+.modale-fermer {
+  position: absolute; top: 10px; right: 10px; width: 40px; height: 40px; padding: 0; border-radius: 50%;
+  background: transparent; color: var(--ink); border: 1px solid var(--line); font-size: 22px; line-height: 1;
+}
+.intro-nouveautes { margin: 0; font-size: 18px; font-weight: 600; }
+.versions { display: grid; gap: 12px; }
+.version { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 8px; }
+.version.actuelle { border-color: var(--track); border-width: 2px; }
+.version-tete { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.version-num { font-family: var(--display); font-weight: 700; font-size: 22px; color: var(--track); }
+.version-nom { font-weight: 700; }
+.version-date { font-size: 13px; color: var(--muted); }
+.version ul { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+.version li { line-height: 1.45; }
+details.anciennes > summary { font-weight: 600; color: var(--ink); padding: 4px 0; }
+details.anciennes[open] > summary { margin-bottom: 10px; }
+details.anciennes .versions { gap: 10px; }
+
 /* Prénoms cliquables */
 button.personne { background: none; border: 0; padding: 0; color: inherit; font: inherit; font-weight: inherit; text-align: left; border-radius: 4px; }
 button.personne:hover b, button.personne:focus-visible b { text-decoration: underline; text-underline-offset: 3px; }
@@ -558,6 +588,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
     <h2>Qui es-tu ?</h2>
     <p class="intro">Touche ton profil pour l'ouvrir. Pas encore de profil ? Ajoute le tien.</p>
     <div class="grille" id="grille-profils"></div>
+    <button type="button" class="lien petit lien-nouveautes" style="justify-self:start">Quoi de neuf ? (version <span class="numero-version"></span>)</button>
     <div class="installer" id="installer" hidden>
       <img src="icon-192.png" alt="" width="48" height="48">
       <div>
@@ -751,7 +782,10 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
         </div>
         <p class="description" id="profil-description"></p>
         <div class="mes-trophees" id="mes-trophees"></div>
-        <button type="button" class="ghost" id="profil-modifier" style="justify-self:start">Modifier mon profil</button>
+        <div class="actions">
+          <button type="button" class="ghost" id="profil-modifier">Modifier mon profil</button>
+          <button type="button" class="lien petit lien-nouveautes">Quoi de neuf ? (version <span class="numero-version"></span>)</button>
+        </div>
       </section>
 
       <section class="card" id="profil-objectifs">
@@ -852,6 +886,18 @@ details summary { cursor: pointer; color: var(--muted); font-size: 14px; }
       </form>
     </div>
   </section>
+</div>
+
+<!-- Fenêtre « Quoi de neuf ? » : s'ouvre toute seule à chaque nouvelle version -->
+<div class="modale-fond" id="nouveautes" hidden>
+  <div class="modale" role="dialog" aria-modal="true" aria-labelledby="nouveautes-titre">
+    <button type="button" class="modale-fermer" id="nouveautes-fermer" aria-label="Fermer">×</button>
+    <span class="label" id="nouveautes-version"></span>
+    <h2 id="nouveautes-titre">Quoi de neuf ?</h2>
+    <p class="intro-nouveautes">Voici les nouveautés que le grand Tom a rajoutées :</p>
+    <div class="versions" id="nouveautes-contenu"></div>
+    <button type="button" id="nouveautes-ok" style="justify-self:start">C'est parti !</button>
+  </div>
 </div>
 
 <!-- Barre d'onglets (remplie selon le rôle) -->
@@ -1782,6 +1828,7 @@ function ouvrirProfil(profil) {
   montrer("ecran-app");
   const memorise = lire("couloir-onglet");
   aller(liste.includes(memorise) ? memorise : "fil");
+  proposerNouveautes();
 }
 
 /* ---------- Pastilles « nouveau » sur les onglets Fil et Semaine ----------
@@ -1844,6 +1891,113 @@ function aller(o, personne = null) {
 }
 
 $("changer-profil").addEventListener("click", () => afficherChoix());
+
+/* =========================================================
+   4 bis. « QUI DE NEUF ? » : l'historique des versions
+   Pour une nouvelle version : l'ajouter EN HAUT de la liste.
+   ========================================================= */
+const VERSIONS = [
+  { num: "1.8", nom: "Le grand calendrier", date: "31 octobre 2026", nouveautes: [
+    "Un calendrier dans le profil de chacun : on voit les séances faites et prévues, jour par jour.",
+    "Bilan d'une période : 7, 14, 21 ou 28 jours, ou les jours de son choix sur le calendrier (séances, km, temps, allure, forme, BPM, types de séance…).",
+    "Trois bilans dans le profil : les 7 derniers jours, les 3 dernières semaines et depuis le début.",
+    "Séances de côtes : on peut indiquer la durée de récup.",
+    "On peut modifier les séances qu'on a publiées (même celles faites à plusieurs).",
+    "Cette fenêtre « Quoi de neuf ? » pour ne rien rater.",
+  ] },
+  { num: "1.7", nom: "Le cœur qui bat", date: "31 octobre 2026", nouveautes: [
+    "Forme du jour de 1 à 5, BPM moyen et BPM max pour chaque séance.",
+    "Nouveau type de séance : le Seuil (des répétitions en temps), avec les BPM de chaque répétition.",
+    "Toutes les durées se notent en heures, minutes et secondes.",
+    "Le coach retrouve ses réglages (répétitions, durées…) quand il modifie une séance.",
+  ] },
+  { num: "1.6", nom: "Tout au même endroit", date: "31 octobre 2026", nouveautes: [
+    "Vue Calendrier dans l'onglet Semaine : un clic sur un jour montre le détail de ses séances.",
+    "Le coach voit toutes les séances qu'il a données, triées par personne et par jour.",
+    "On peut retirer une séance du coach qu'on n'a pas faite.",
+  ] },
+  { num: "1.5", nom: "Ensemble", date: "30 octobre 2026", nouveautes: [
+    "Objectifs de la semaine (kilomètres, séances) avec barres de progression.",
+    "Records personnels du 400 m au marathon.",
+    "Le coach envoie une séance à plusieurs personnes d'un coup.",
+    "On publie une séance faite avec d'autres : elle compte pour tout le monde.",
+  ] },
+  { num: "1.4", nom: "Comme une vraie appli", date: "30 octobre 2026", nouveautes: [
+    "Réactions sur les posts : 👏 🔥 💪.",
+    "Un clic sur un prénom ouvre le profil de la personne.",
+    "Le coach peut modifier une séance déjà envoyée.",
+    "Pastilles « nouveau » sur le Fil et la Semaine.",
+    "L'appli s'installe sur l'écran d'accueil de l'iPhone, avec son icône.",
+    "Les athlètes aussi ont les modèles de séance (footing, côtes…).",
+    "Les photos du Fil s'affichent en vignettes, à agrandir d'un clic.",
+  ] },
+  { num: "1.3", nom: "Chacun sa couleur", date: "29 octobre 2026", nouveautes: [
+    "Chaque personne choisit sa couleur, et toute l'appli prend cette couleur.",
+    "On n'affiche plus que les prénoms.",
+    "On peut ajouter une photo à ses séances.",
+  ] },
+  { num: "1.2", nom: "Place aux trophées", date: "29 octobre 2026", nouveautes: [
+    "Onglet Trophées : cette semaine et depuis toujours (le plus assidu, la plus grosse progression…).",
+    "Statistiques et courbe d'évolution dans le profil.",
+    "Distance, durée et allure pour chaque séance.",
+  ] },
+  { num: "1.1", nom: "Le coach passe à la vitesse supérieure", date: "29 octobre 2026", nouveautes: [
+    "Séances préremplies pour le coach : footing, fractionné, côtes, vitesse…",
+    "Commentaires sous les posts du Fil.",
+    "Le coach peut se fixer ses propres séances.",
+  ] },
+  { num: "1.0", nom: "Les débuts", date: "29 octobre 2026", nouveautes: [
+    "Profils sans mot de passe : on choisit son prénom et c'est parti.",
+    "Le coach écrit les séances, chaque athlète les retrouve dans sa semaine.",
+    "On coche ses séances et on donne son ressenti.",
+    "Le Fil, l'onglet Semaine et un profil avec photo et description.",
+  ] },
+];
+const VERSION_ACTUELLE = VERSIONS[0].num;
+document.querySelectorAll(".numero-version").forEach((x) => (x.textContent = VERSION_ACTUELLE));
+
+function blocVersion(v, actuelle) {
+  return el("section", { class: "version" + (actuelle ? " actuelle" : "") }, [
+    el("div", { class: "version-tete" }, [
+      el("span", { class: "version-num" }, "v" + v.num),
+      el("span", { class: "version-nom" }, v.nom),
+      el("span", { class: "version-date" }, v.date),
+    ]),
+    el("ul", {}, v.nouveautes.map((n) => el("li", {}, n))),
+  ]);
+}
+
+let elementAvantModale = null;
+function ouvrirNouveautes() {
+  const [derniere, ...anciennes] = VERSIONS;
+  $("nouveautes-version").textContent = "Version " + VERSION_ACTUELLE;
+  $("nouveautes-contenu").replaceChildren(
+    blocVersion(derniere, true),
+    el("details", { class: "anciennes" }, [
+      el("summary", {}, "Voir les " + anciennes.length + " versions précédentes"),
+      el("div", { class: "versions" }, anciennes.map((v) => blocVersion(v, false))),
+    ]),
+  );
+  elementAvantModale = document.activeElement;
+  $("nouveautes").hidden = false;
+  document.body.style.overflow = "hidden";
+  $("nouveautes-ok").focus();
+}
+function fermerNouveautes() {
+  $("nouveautes").hidden = true;
+  document.body.style.overflow = "";
+  ecrire("couloir-version-vue", VERSION_ACTUELLE);
+  if (elementAvantModale && elementAvantModale.focus) elementAvantModale.focus();
+}
+$("nouveautes-ok").addEventListener("click", fermerNouveautes);
+$("nouveautes-fermer").addEventListener("click", fermerNouveautes);
+$("nouveautes").addEventListener("click", (e) => { if (e.target === $("nouveautes")) fermerNouveautes(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("nouveautes").hidden) fermerNouveautes(); });
+document.querySelectorAll(".lien-nouveautes").forEach((b) => b.addEventListener("click", ouvrirNouveautes));
+// Ouverte automatiquement quand une version n'a pas encore été vue sur cet appareil
+function proposerNouveautes() {
+  if (lire("couloir-version-vue") !== VERSION_ACTUELLE) setTimeout(ouvrirNouveautes, 400);
+}
 
 /* =========================================================
    5. PAGE D'ACCUEIL « QUI ES-TU ? »
