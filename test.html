@@ -674,8 +674,10 @@ button.ghost, .bouton-fichier { border-color: #d4d4d4; }
 button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
 .nav button, .tuile, button.personne, .photo-seance, .visionneuse button, .reps button { border-radius: 0; }
 
-/* Avatars ronds */
-.avatar, .avatar.grand, .avatar.petit, .avatar.mini { border-radius: 50%; }
+/* Avatars carrés */
+.avatar, .avatar.grand { border-radius: 6px; }
+.avatar.petit { border-radius: 4px; }
+.avatar.mini { border-radius: 3px; }
 
 /* Pastilles et étiquettes */
 .chip, .pill { border: 0; background: var(--carte); font-weight: 500; padding: 3px 11px; }
@@ -684,10 +686,16 @@ button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
 .seance-date { font-size: 11px; letter-spacing: .1em; }
 
 /* Le fil : un catalogue, sans cadres */
-.fil { gap: 0; }
+.fil { gap: 10px; }
 .seance { background: var(--carte); border: 0; border-radius: 4px; }
 .seance.faite { border-left: 0; }
-.seance.post { background: transparent; border: 0; border-radius: 0; padding: 22px 0 26px; border-bottom: 1px solid var(--line); gap: 10px; }
+/* Chaque séance prend un fond léger de la couleur de son auteur, pour reconnaître les personnes d'un coup d'œil */
+.seance.post { --teinte: color-mix(in srgb, var(--auteur, var(--line)) 11%, var(--surface)); background: var(--teinte); border: 0; border-radius: 4px; padding: 16px 16px 18px; gap: 10px; }
+@media (prefers-color-scheme: dark) { .seance.post { --teinte: color-mix(in srgb, var(--auteur, var(--line)) 16%, var(--surface)); } }
+.seance.post .reaction, .seance.post .chip, .seance.post .pill { background: color-mix(in srgb, var(--auteur, var(--line)) 14%, var(--surface)); }
+.seance.post .commentaires { border-top-color: color-mix(in srgb, var(--auteur, var(--line)) 22%, var(--surface)); }
+.seance.post .reps-table th, .seance.post .reps-table td { border-bottom-color: color-mix(in srgb, var(--auteur, var(--line)) 22%, var(--surface)); }
+.separateur-date { margin: 14px 0 2px; }
 .seance.post .seance-titre { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; }
 .seance.proposee { border: 1.5px dashed var(--auteur, var(--track)); background: transparent; }
 .post-nom b { font-weight: 600; }
