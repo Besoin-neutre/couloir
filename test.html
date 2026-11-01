@@ -734,6 +734,20 @@ button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
 .trophee { background: var(--carte); border: 0; border-radius: 4px; }
 .trophee-tete h3 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; text-transform: none; color: var(--ink); }
 
+/* Course ou vélo */
+.choix-sport { justify-self: start; min-width: 200px; }
+.type-chip.sport-velo { color: var(--ink); }
+
+/* Le prénom de Tomi en lettres d'or */
+.nom-or, .est-tomi b, .est-tomi .nom, .mention.est-tomi {
+  background: linear-gradient(100deg, #6e4500 0%, #a87508 30%, #d4a52a 50%, #a87508 70%, #6e4500 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent !important; -webkit-text-fill-color: transparent;
+  font-weight: 800;
+}
+@media (prefers-color-scheme: dark) {
+  .nom-or, .est-tomi b, .est-tomi .nom, .mention.est-tomi { background-image: linear-gradient(100deg, #c99a1e 0%, #f1d36b 40%, #fff2b3 50%, #f1d36b 60%, #c99a1e 100%); }
+}
+
 /* Ordinateur : une seule colonne, un peu plus large que sur téléphone */
 @media (min-width: 1000px) {
   .wrap, .nav-int { max-width: 680px; }
@@ -1140,7 +1154,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
 function verifier({ data, error }) { if (error) throw error; return data; }
 
 const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url, couleur, objectif_km, objectif_seances, records, notifs";
-const CHAMPS_SEANCE = "id, cree_le, date, type, parametres, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, duree_s, forme, bpm_moy, bpm_max, reps_bpm, vo2max, photos, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
+const CHAMPS_SEANCE = "id, cree_le, date, type, sport, parametres, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, duree_min, duree_s, forme, bpm_moy, bpm_max, reps_bpm, vo2max, photos, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
 const CHAMPS_COMMENTAIRE = "id, texte, gif_url, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url, couleur)";
 const CHAMPS_FIL = CHAMPS_SEANCE
   + ", reactions(auteur_id, emoji)"
@@ -1177,7 +1191,7 @@ const donnees = {
       .eq("athlete_id", id).order("date", { ascending: true }).limit(2000));
   },
   async seancesFaitesDe(id) {
-    return verifier(await sb.from("seances").select("id, date, fait_le, type, ressenti, distance_km, duree_min, duree_s")
+    return verifier(await sb.from("seances").select("id, date, fait_le, type, sport, ressenti, distance_km, duree_min, duree_s")
       .eq("athlete_id", id).eq("fait", true));
   },
   async nbSeancesFaites(id) {
@@ -1319,7 +1333,7 @@ const donnees = {
   // Pour les statistiques et les trophées : toutes les séances faites et tous les commentaires
   async seancesFaites() {
     return toutLire(() => sb.from("seances")
-      .select("id, athlete_id, date, fait_le, type, ressenti, distance_km, duree_min, duree_s, bpm_max, reps_bpm, vo2max, photo_url, photos")
+      .select("id, athlete_id, date, fait_le, type, sport, ressenti, distance_km, duree_min, duree_s, bpm_max, reps_bpm, vo2max, photo_url, photos")
       .eq("fait", true).order("id"));
   },
   async tousLesCommentaires() {
@@ -1381,6 +1395,7 @@ function ilYa(iso) {
 // « de Tom », mais « d'Inès » devant une voyelle ou un h
 function de(prenom) { return (/^[aeiouyhàâäéèêëîïôöùûüœ]/i.test(prenom) ? "d'" : "de ") + prenom; }
 function nomComplet(p) { return p && p.prenom ? p.prenom : "Coach"; }
+const ID_TOMI = "74370ba6-0934-4127-960e-bfd87fe0b3ea"; // Tomi : prénom en or, et seul à voir l'espace utilisé
 
 function remplirDisciplines(select) {
   select.replaceChildren(...DISCIPLINES.map((d) => el("option", {}, d)));
@@ -1670,6 +1685,14 @@ function dureeModele(m, v) { return m && m.remplitDuree && v ? (m.dureeTotale ? 
    surChangement(type, valeurs) est appelé à chaque modification. */
 function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = false, apercu: titreApercu = "Texte de la séance", surChangement = () => {} } = {}) {
   let type = MODELES[typeInitial] ? typeInitial : "footing";
+  let sport = "course";
+  const boutonsSport = [["course", "Course"], ["velo", "Vélo"]].map(([v, nom]) => {
+    const b = el("button", { type: "button", "aria-pressed": String(v === sport), "data-sport": v }, nom);
+    b.addEventListener("click", () => { sport = v; majSport(); maj(); });
+    return b;
+  });
+  const choixSport = el("div", { class: "bascule petite choix-sport", role: "group", "aria-label": "Course ou vélo" }, boutonsSport);
+  function majSport() { boutonsSport.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.sport === sport))); }
   const saisies = {}; // ce qui a été tapé, par type (gardé quand on change de type puis qu'on revient)
   const types = el("div", { class: "types" });
   const champs = el("div", { class: "champs" });
@@ -1739,13 +1762,13 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
   }
   function seance() {
     const m = MODELES[type];
-    if (m.libre) return { type, titre: titre.value.trim(), contenu: contenu.value.trim(), parametres: null };
+    if (m.libre) return { type, sport, titre: titre.value.trim(), contenu: contenu.value.trim(), parametres: null };
     const auto = texteAuto();
     const parametres = { ...auto.parametres };
     if (titreModifie) parametres.titreModifie = true;
     if (texteModifie) parametres.texteModifie = true;
     return {
-      type, parametres,
+      type, sport, parametres,
       titre: titreModifie ? apTitre.value.trim() || auto.titre : auto.titre,
       contenu: texteModifie ? apContenu.value.trim() : auto.contenu,
     };
@@ -1814,6 +1837,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
 
   return {
     bloc: el("div", { class: "editeur-modele" }, [
+      el("fieldset", {}, [el("legend", { class: "label" }, "Sport"), choixSport]),
       el("fieldset", {}, [el("legend", { class: "label" }, "Type de séance"), types]),
       champs, optionEch, libre, apercu,
     ]),
@@ -1822,6 +1846,8 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     choisir,
     // Recharge une séance enregistrée : avec ses réglages si on les a, sinon en « séance libre »
     charger(s) {
+      sport = s.sport === "velo" ? "velo" : "course";
+      majSport();
       const m = MODELES[s.type];
       if (m && !m.libre && s.parametres) {
         (m.champs || []).forEach((c) => { if (s.parametres[c.id] != null) saisies[cle(c, s.type)] = s.parametres[c.id]; });
@@ -1846,6 +1872,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
 function enTeteSeance(s) {
   return el("div", { class: "seance-haut" }, [
     el("span", { class: "seance-date" }, formatDate(s.date)),
+    s.sport === "velo" ? el("span", { class: "type-chip sport-velo" }, "Vélo") : null,
     s.type && MODELES[s.type] && s.type !== "libre" ? el("span", { class: "type-chip" }, MODELES[s.type].nom) : null,
   ]);
 }
@@ -1862,6 +1889,22 @@ function lireNombre(texte) {
 }
 function formatKm(km) {
   return (Math.round(km * 10) / 10).toLocaleString("fr-FR") + " km";
+}
+// Distance qui compte pour la course (le vélo ne s'ajoute pas aux kilomètres courus)
+function kmCourse(s) { return s.sport === "velo" ? 0 : Number(s.distance_km) || 0; }
+// Allure à afficher pour une séance : [valeur, unité], ou null
+//  - vélo : vitesse en km/h
+//  - footing fractionné : la distance comprend la marche, donc on prend la moyenne des allures des blocs
+//  - sinon : temps total ÷ distance
+function allureSeance(s) {
+  const km = Number(s.distance_km) || 0, sec = dureeSec(s) || 0;
+  if (s.sport === "velo") return km && sec ? [(Math.round((km / (sec / 3600)) * 10) / 10).toLocaleString("fr-FR"), "km/h"] : null;
+  if (s.type === "footing_fractionne") {
+    const allures = (Array.isArray(s.reps_bpm) ? s.reps_bpm : []).filter((r) => r && r.allure).map((r) => r.allure);
+    return allures.length ? [formatAllure(allures.reduce((t, a) => t + a, 0) / allures.length), "min/km en courant"] : null;
+  }
+  const a = allure(km, sec);
+  return a ? [a.replace(" /km", ""), "min/km"] : null;
 }
 // Allure en minutes par kilomètre : « 5:18 /km »
 function allure(km, sec) {
@@ -1901,7 +1944,7 @@ function etatEffort(s, debut = []) {
   const grands = [
     km ? [(Math.round(km * 10) / 10).toLocaleString("fr-FR"), "km"] : null,
     sec ? (sec >= 3600 ? [Math.floor(sec / 3600) + ":" + String(Math.round((sec % 3600) / 60)).padStart(2, "0"), "heure"] : [String(Math.round(sec / 60)), "min"]) : null,
-    allure(km, sec) ? [allure(km, sec).replace(" /km", ""), "min/km"] : null,
+    allureSeance(s),
   ].filter(Boolean);
   const chiffres = grands.length ? el("div", { class: "chiffres" }, grands.map(([n, u]) =>
     el("div", { class: "chiffre-bloc" }, [el("span", { class: "nombre" }, n), el("span", { class: "unite" }, u)]))) : null;
@@ -2321,6 +2364,7 @@ function majEntete() {
   if (!moi) return;
   $("session-avatar").replaceChildren(avatarEl(moi, "petit"));
   $("session-nom").textContent = moi.prenom;
+  $("session-nom").classList.toggle("nom-or", estTomi(moi));
 }
 
 function ouvrirProfil(profil) {
@@ -2412,6 +2456,11 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "3.1", nom: "Deux roues", date: "1er novembre 2026", nouveautes: [
+    "Pour chaque séance, on choisit Course ou Vélo. Une sortie vélo affiche sa vitesse en km/h et ne compte pas dans les kilomètres courus.",
+    "Footing fractionné : l'allure ne mélange plus la marche et la course ; on affiche la moyenne des allures des blocs courus.",
+    "Le prénom de Tomi s'écrit désormais en lettres d'or. Logique.",
+  ] },
   { num: "3.0", nom: "Nouvelle allure", date: "1er novembre 2026", nouveautes: [
     "Nouvelle direction artistique, inspirée de Scuffers : Helvetica, noir et blanc, et ta couleur en seule touche.",
     "Les chiffres clés de chaque séance (distance, temps, allure) s'affichent en grand.",
@@ -2599,7 +2648,7 @@ async function afficherChoix() {
   const tuiles = profils.map((p) => {
     const bouton = el("button", { type: "button", class: "tuile" + (p.id === dernier ? " actif" : "") }, [
       avatarEl(p),
-      el("span", { class: "tuile-nom" }, nomComplet(p)),
+      el("span", { class: "tuile-nom" + (estTomi(p) ? " nom-or" : "") }, nomComplet(p)),
     ]);
     bouton.addEventListener("click", () => ouvrirProfil(p));
     return el("div", { class: "tuile-wrap" }, bouton);
@@ -2694,8 +2743,10 @@ function choixPersonnes(prefixe, personnes, { coches = [], raccourcis = false } 
 }
 
 // Un prénom (et son avatar) cliquable qui ouvre le profil de la personne
+// Tomi a son prénom en lettres d'or, partout
+function estTomi(p) { return !!p && p.id === ID_TOMI; }
 function lienPersonne(p, enfants, classe = "personne") {
-  const b = el("button", { type: "button", class: classe, title: "Voir le profil " + de(nomComplet(p)) }, enfants);
+  const b = el("button", { type: "button", class: classe + (estTomi(p) ? " est-tomi" : ""), title: "Voir le profil " + de(nomComplet(p)) }, enfants);
   b.addEventListener("click", () => voirProfil(p));
   return b;
 }
@@ -2781,7 +2832,7 @@ function texteAvecMentions(texte) {
   return morceauxMentions(texte).map((m) => {
     if (typeof m === "string") return m;
     const b = lienPersonne(m, "@" + m.prenom, "personne mention");
-    b.style.color = couleurDe(m);
+    if (!estTomi(m)) b.style.color = couleurDe(m);
     return b;
   });
 }
@@ -3179,7 +3230,7 @@ $("annuler-publier").addEventListener("click", fermerPublier);
 
 $("form-publier").addEventListener("submit", async (event) => {
   event.preventDefault();
-  const { type, titre, contenu, parametres } = modelePublier.seance();
+  const { type, sport, titre, contenu, parametres } = modelePublier.seance();
   if (!titre && !contenu) return afficherMessage("erreur-publier", "Donne au moins un titre ou un contenu à ta séance.");
   try {
     const effort = effortPublier.lire();
@@ -3193,7 +3244,7 @@ $("form-publier").addEventListener("submit", async (event) => {
       const ajouts = avec ? avec.filter((id) => !compagnonsAvant.some((c) => c.athlete_id === id)) : [];
       const retraits = avec ? compagnonsAvant.filter((c) => !c.fait && !avec.includes(c.athlete_id)) : [];
       await pendant($("bouton-publier"), "Enregistrement…", async () => {
-        const commun = { type, parametres, date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null, ...effort };
+        const commun = { type, sport, parametres, date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null, ...effort };
         const groupe_id = groupeEnModif || (ajouts.length ? nouvelUuid() : null);
         await donnees.majSeance(enModif.id, {
           ...(groupe_id && !groupeEnModif ? { groupe_id, principal: true } : {}),
@@ -3221,7 +3272,7 @@ $("form-publier").addEventListener("submit", async (event) => {
     const avec = choixAvec ? choixAvec.valeurs() : [];
     await pendant($("bouton-publier"), "Publication…", async () => {
       const commun = {
-        coach_id: null, type, parametres, date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null,
+        coach_id: null, type, sport, parametres, date: $("pub-date").value || null, titre: titre || null, contenu: contenu || null,
         fait: true, fait_le: new Date().toISOString(), ...effort,
       };
       // Ma séance (avec mon ressenti, mon commentaire et la photo)…
@@ -3473,9 +3524,9 @@ function recapPeriode(seances, debut, fin) {
   let km = 0, sec = 0, kmAllure = 0, secAllure = 0, maxKm = 0;
   const types = {}, jours = new Set();
   faites.forEach((x) => {
-    const d = Number(x.distance_km) || 0, t = dureeSec(x) || 0;
+    const d = kmCourse(x), t = dureeSec(x) || 0;
     km += d; sec += t; maxKm = Math.max(maxKm, d);
-    if (d && t) { kmAllure += d; secAllure += t; }
+    if (d && t && x.type !== "footing_fractionne") { kmAllure += d; secAllure += t; }
     const nom = (MODELES[x.type] || MODELES.libre).nom;
     types[nom] = (types[nom] || 0) + 1;
     jours.add(jourCalendrier(x));
@@ -3835,7 +3886,7 @@ $("form-seance").addEventListener("submit", async (event) => {
   afficherMessage("ok-seance", "");
   afficherMessage("erreur-seance", "");
   const athlete = athletes.find((a) => a.id === choixAthlete.value);
-  const { type: typeChoisi, titre, contenu, parametres } = editeurPlanif.seance();
+  const { type: typeChoisi, sport, titre, contenu, parametres } = editeurPlanif.seance();
   const date = $("seance-date").value || null;
   const consignes = $("seance-consignes").value.trim() || null;
   if (!titre && !contenu) return afficherMessage("erreur-seance", "Donne au moins un titre ou un contenu à la séance.");
@@ -3845,7 +3896,7 @@ $("form-seance").addEventListener("submit", async (event) => {
       // En mode libre, on garde le type d'origine (footing, côtes…) pour l'étiquette
       const type = typeChoisi === "libre" ? (seanceEnModif.type || "libre") : typeChoisi;
       await pendant($("bouton-seance"), "Enregistrement…", () =>
-        donnees.majSeance(seanceEnModif.id, { date, type, parametres, titre: titre || null, contenu: contenu || null, consignes }));
+        donnees.majSeance(seanceEnModif.id, { date, type, sport, parametres, titre: titre || null, contenu: contenu || null, consignes }));
       finirModif();
       afficherMessage("ok-seance", "Séance modifiée.");
       afficherSeancesCoach();
@@ -3860,7 +3911,7 @@ $("form-seance").addEventListener("submit", async (event) => {
   try {
     // Une séance par personne : chacun la coche et donne son ressenti de son côté
     await pendant($("bouton-seance"), "Envoi…", () => donnees.envoyerSeance(ids.map((id) => ({
-      athlete_id: id, coach_id: moi.id, date, type: typeChoisi, parametres,
+      athlete_id: id, coach_id: moi.id, date, type: typeChoisi, sport, parametres,
       titre: titre || null, contenu: contenu || null, consignes,
     }))));
     const noms = ids.map((id) => { const a = athletes.find((x) => x.id === id); return a.estMoi ? "toi" : a.prenom; });
@@ -3918,7 +3969,7 @@ function statsPersonne(seances) {
   let km = 0, min = 0, maxKm = 0, rpeTotal = 0, rpeNb = 0, durs = 0;
   const types = new Set();
   seances.forEach((s) => {
-    const d = Number(s.distance_km) || 0, t = Math.round((dureeSec(s) || 0) / 60);
+    const d = kmCourse(s), t = Math.round((dureeSec(s) || 0) / 60);
     const w = parSemaine[cleSemaine(jourDeSeance(s))] ||= semaineVide();
     w.n++; w.km += d; w.min += t; w.maxKm = Math.max(w.maxKm, d); w.types.add(s.type || "libre");
     if (s.ressenti >= 8) { w.durs++; durs++; }
@@ -4353,6 +4404,7 @@ async function afficherProfil() {
   $("profil-vue").hidden = false;
   $("profil-avatar").replaceChildren(avatarEl(p, "grand"));
   $("profil-nom").textContent = nomComplet(p);
+  $("profil-nom").classList.toggle("nom-or", estTomi(p));
   $("profil-discipline").textContent = p.discipline || "";
   const desc = $("profil-description");
   desc.textContent = p.description || (estMoi ? "Pas encore de description. Présente-toi en quelques mots !" : "Pas encore de description.");
@@ -4464,7 +4516,6 @@ function afficherMesTrophees(stats, p = moi) {
 }
 
 /* ---------- Notifications ---------- */
-const ID_TOMI = "74370ba6-0934-4127-960e-bfd87fe0b3ea"; // seul Tomi voit l'espace utilisé
 const VAPID_PUBLIQUE = "BB5sEDvrFzhgtxNxa1XJ37gHIQGfg0zpKkWDPamN6QP0uT1D9xrZ0PChi1PDFky0mJqE9Sx7EkDFyTVgMVrhGvE";
 const TYPES_NOTIFS = [
   { cle: "seance_coach", nom: "Quand le coach m'envoie une séance" },
