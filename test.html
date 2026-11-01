@@ -726,16 +726,10 @@ button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
 .trophee { background: var(--carte); border: 0; border-radius: 4px; }
 .trophee-tete h3 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; text-transform: none; color: var(--ink); }
 
-/* Ordinateur : plus large, le fil sur deux colonnes */
+/* Ordinateur : une seule colonne, un peu plus large que sur téléphone */
 @media (min-width: 1000px) {
-  .wrap { max-width: 1080px; }
-  .nav-int { max-width: 680px; }
-  .wrap > .card, .panneau:not(#panneau-fil) { width: 100%; max-width: 680px; margin-inline: auto; }
-  #form-publier, #propositions { max-width: 680px; }
-  .top { max-width: 1080px; }
+  .wrap, .nav-int { max-width: 680px; }
   h2 { font-size: 48px; }
-  .fil { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 40px; }
-  .fil > .separateur-date, .fil > .vide, .fil > .error, .fil > .muted { grid-column: 1 / -1; }
 }
 </style>
 <!-- Bibliothèque officielle de Supabase (le « traducteur » entre le site et la base de données) -->
@@ -2413,7 +2407,7 @@ const VERSIONS = [
   { num: "3.0", nom: "Nouvelle allure", date: "1er novembre 2026", nouveautes: [
     "Nouvelle direction artistique, inspirée de Scuffers : Helvetica, noir et blanc, et ta couleur en seule touche.",
     "Les chiffres clés de chaque séance (distance, temps, allure) s'affichent en grand.",
-    "Sur ordinateur, le fil passe sur deux colonnes.",
+    "Sur ordinateur, la page est un peu plus large et le fil reste sur une seule colonne.",
   ] },
   { num: "2.4", nom: "Chacun son post", date: "1er novembre 2026", nouveautes: [
     "Une séance faite à plusieurs : quand chacun la valide, sa version apparaît dans le fil, avec ses photos, ses BPM et son commentaire.",
