@@ -746,17 +746,19 @@ button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
 .reps .case-recup.est-recup { opacity: 1; }
 .reps-table tr.ligne-recup td { color: var(--muted); font-style: italic; }
 
-/* Footing avec marche : les blocs */
-.blocs { grid-column: 1 / -1; display: grid; gap: 8px; }
-.bloc { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 6px; align-items: center; padding: 8px; background: var(--surface); border-radius: 4px; }
-.bloc.marche { background: transparent; border: 1px dashed var(--line); }
-.bloc > input { grid-column: 1 / -1; }
-.bloc select { width: auto; padding: 8px 4px; font-size: 15px; }
-.bloc .temps { flex-wrap: nowrap; gap: 3px; min-width: 0; }
-.bloc .temps input { width: 40px; padding: 8px 2px; }
-.bloc .temps span { font-size: 13px; margin-right: 2px; }
-.bloc-num { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 1.2em; }
-.retirer-bloc { padding: 4px 12px; font-size: 18px; line-height: 1; }
+/* Footing avec marche : les blocs (course + récup sur une ligne) */
+.blocs { grid-column: 1 / -1; display: grid; gap: 6px; }
+.bloc { display: grid; grid-template-columns: 1.4em minmax(0, 1fr) minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.bloc > .bloc-consigne { grid-column: 2 / -1; }
+.bloc input { text-align: center; padding: 9px 4px; font-weight: 600; }
+.bloc input.bloc-consigne { text-align: left; font-weight: 400; padding: 9px 12px; }
+.bloc input.invalide { border-color: var(--erreur); }
+.bloc-entete { margin-bottom: -2px; }
+.bloc-entete .label { text-align: center; font-size: 10px; }
+.bloc-num { font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; }
+.bloc-outils { display: flex; gap: 2px; }
+.bouton-icone { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; border-color: transparent; font-size: 20px; line-height: 1; color: var(--muted); }
+.bouton-icone:hover { color: var(--ink); }
 
 /* Course ou vélo */
 .choix-sport { justify-self: start; min-width: 200px; }
@@ -1615,11 +1617,11 @@ const MODELES = {
   // (la clé reste « footing_fractionne » pour les anciennes séances)
   footing_fractionne: {
     nom: "Footing avec marche", remplitDuree: true, blocs: true, champs: [],
-    defautBlocs: [{ t: "course", d: 600 }, { t: "marche", d: 120 }, { t: "course", d: 600 }, { t: "marche", d: 120 }, { t: "course", d: 600 }],
+    defautSeries: [{ c: 600, r: 120 }, { c: 600, r: 120 }, { c: 600, r: 0 }],
     nbReps: (v) => blocsDe(v).length,
     dureeTotale: (v) => blocsDe(v).reduce((t, b) => t + (b.d || 0), 0),
     titre: (v) => "Footing avec marche · " + enDuree(blocsDe(v).filter((b) => b.t === "course").reduce((t, b) => t + (b.d || 0), 0)) + " de course",
-    corps: (v) => blocsDe(v).map((b) => (b.t === "marche" ? "Marche " : "Course ") + enDuree(b.d || 0) + (b.consigne ? " : " + b.consigne : "")).join("\n"),
+    corps: (v) => texteSeries(seriesDe(v)),
   },
   sortie_longue: {
     nom: "Sortie longue", remplitDuree: true,
@@ -1697,20 +1699,61 @@ function nbRepsDe(s) {
   const m = MODELES[s.type];
   return m && m.nbReps && s.parametres ? m.nbReps(s.parametres) : 0;
 }
-// Les blocs d'un footing avec marche (les anciens « 3 × 10 min, récup 1 min » sont convertis)
-function blocsDe(v) {
-  if (v && Array.isArray(v.blocs) && v.blocs.length) return v.blocs;
-  if (v && v.reps && v.duree) {
+// Footing avec marche : chaque bloc = de la course puis une récup en marchant { c, r, consigne }
+// (les anciennes formes — « 3 × 10 min, récup 1 min » ou une liste course / marche — sont converties)
+function seriesDe(v) {
+  if (v && Array.isArray(v.series) && v.series.length) return v.series;
+  if (v && Array.isArray(v.blocs) && v.blocs.length) {
     const res = [];
-    for (let i = 0; i < v.reps; i++) { if (i) res.push({ t: "marche", d: v.recup || 60 }); res.push({ t: "course", d: v.duree }); }
+    v.blocs.forEach((b) => {
+      if (b.t === "marche" && res.length && !res[res.length - 1].r) res[res.length - 1].r = b.d;
+      else if (b.t === "marche") res.push({ c: 0, r: b.d });
+      else res.push({ c: b.d, r: 0, ...(b.consigne ? { consigne: b.consigne } : {}) });
+    });
     return res;
   }
-  return MODELES.footing_fractionne.defautBlocs;
+  if (v && v.reps && v.duree) return Array.from({ length: v.reps }, (_, i) => ({ c: v.duree, r: i < v.reps - 1 ? v.recup || 60 : 0 }));
+  return MODELES.footing_fractionne.defautSeries;
 }
+// La même chose ligne par ligne (course, puis marche) : pour le tableau et les durées
+function blocsDe(v) {
+  return seriesDe(v).flatMap((b) => [
+    ...(b.c ? [{ t: "course", d: b.c, consigne: b.consigne }] : []),
+    ...(b.r ? [{ t: "marche", d: b.r }] : []),
+  ]);
+}
+// « 3 × (10 min de course + 2 min de marche) » : les blocs identiques qui se suivent sont regroupés
+function texteSeries(series) {
+  const morceau = (b) => [b.c ? enDuree(b.c) + " de course" : null, b.r ? enDuree(b.r) + " de marche" : null].filter(Boolean).join(" + ");
+  const lignes = [];
+  for (let i = 0; i < series.length; ) {
+    let n = 1;
+    while (i + n < series.length && series[i + n].c === series[i].c && series[i + n].r === series[i].r && (series[i + n].consigne || "") === (series[i].consigne || "")) n++;
+    const b = series[i];
+    lignes.push((n > 1 ? n + " × (" + morceau(b) + ")" : morceau(b)) + (b.consigne ? " : " + b.consigne : ""));
+    i += n;
+  }
+  return lignes.join("\n");
+}
+// Durée tapée vite : « 10 » = 10 min, « 1:30 » = 1 min 30, « 45s » = 45 s ; vide = 0
+function lireDureeBloc(texte) {
+  const t = String(texte || "").trim().toLowerCase().replace(/['’]/g, ":").replace(",", ".");
+  if (!t) return 0;
+  let m;
+  if ((m = t.match(/^(\d+(?:\.\d+)?)\s*s(ec)?$/))) return Math.round(Number(m[1]));
+  if ((m = t.match(/^(\d+):(\d{1,2})$/))) return Number(m[1]) * 60 + Number(m[2]);
+  if ((m = t.match(/^(\d+(?:\.\d+)?)\s*(min|mn|m)?$/))) return Math.round(Number(m[1]) * 60);
+  return NaN;
+}
+function texteDureeBloc(sec) {
+  if (!sec) return "";
+  return sec % 60 ? Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0") : String(sec / 60);
+}
+
 // Ce qui est prévu pour chaque répétition : sa distance (m) et/ou sa durée (s),
 // et, pour un footing avec marche, chaque ligne (course ou récup, et sa durée)
 function prevuRep(v, type) {
-  if (type === "footing_fractionne" || (v && Array.isArray(v.blocs))) {
+  if (type === "footing_fractionne" || (v && (Array.isArray(v.blocs) || Array.isArray(v.series)))) {
     return { distance: null, duree: null, lignes: blocsDe(v).map((b) => ({ recup: b.t === "marche", duree: b.d || null })) };
   }
   return { distance: Number(v && v.distance) || null, duree: Number(v && v.duree) || null };
@@ -1787,53 +1830,52 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
   apContenu.addEventListener("input", ajusterHauteur);
   const apercu = el("div", { class: "apercu texte-seance" }, [el("span", { class: "label" }, titreApercu), apTitre, apContenu, etatTexte, revenir]);
 
-  // Footing avec marche : la liste des blocs (course ou marche, durée, consigne)
-  let blocs = null;
+  // Footing avec marche : des blocs « course + récup en marchant », qu'on peut dupliquer
+  let series = null;
   const zoneBlocs = el("div", { class: "blocs" });
-  function blocsCourants() { return (blocs || MODELES.footing_fractionne.defautBlocs).map((b) => ({ ...b })); }
+  const ICONE_COPIER = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
+  const ICONE_CONSIGNE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+  function seriesCourantes() { return (series || MODELES.footing_fractionne.defautSeries).map((b) => ({ ...b })); }
   function construireBlocs() {
-    const liste = blocsCourants();
-    blocs = liste;
-    const lignes = liste.map((b, i) => {
+    series = seriesCourantes();
+    const iconeBouton = (svg, label, action) => {
+      const b = el("button", { type: "button", class: "ghost bouton-icone", "aria-label": label, title: label });
+      b.innerHTML = svg;
+      b.addEventListener("click", action);
+      return b;
+    };
+    const lignes = series.map((b, i) => {
       const nom = "Bloc " + (i + 1);
-      const sorte = el("select", { id: prefixe + "-bloc-t-" + i, "aria-label": nom + " : course ou marche" }, [
-        el("option", { value: "course" }, "Course"), el("option", { value: "marche" }, "Marche"),
-      ]);
-      sorte.value = b.t;
-      sorte.addEventListener("change", () => { blocs[i].t = sorte.value; ligne.classList.toggle("marche", sorte.value === "marche"); maj(); });
-      const min = el("input", { id: prefixe + "-bloc-min-" + i, type: "text", inputmode: "numeric", class: "t-min", "aria-label": nom + " : minutes" });
-      const sec = el("input", { id: prefixe + "-bloc-s-" + i, type: "text", inputmode: "numeric", class: "t-s", "aria-label": nom + " : secondes", placeholder: "0" });
-      min.value = b.d ? String(Math.floor(b.d / 60)) : "";
-      sec.value = b.d && b.d % 60 ? String(b.d % 60) : "";
-      const lireTemps = () => {
-        const m = Number((min.value || "0").replace(",", ".")), s2 = Number((sec.value || "0").replace(",", "."));
-        blocs[i].d = Number.isFinite(m) && Number.isFinite(s2) ? Math.round(m * 60 + s2) : 0;
-        maj();
+      const caseDuree = (cle, label) => {
+        const inp = el("input", { type: "text", inputmode: "decimal", id: prefixe + "-bloc-" + cle + "-" + i, "aria-label": nom + " : " + label, placeholder: "0", autocomplete: "off" });
+        inp.value = texteDureeBloc(b[cle]);
+        inp.addEventListener("input", () => { const v = lireDureeBloc(inp.value); inp.classList.toggle("invalide", Number.isNaN(v)); series[i][cle] = Number.isNaN(v) ? 0 : v; maj(); });
+        return inp;
       };
-      min.addEventListener("input", lireTemps); sec.addEventListener("input", lireTemps);
-      const consigne = el("input", { id: prefixe + "-bloc-c-" + i, placeholder: b.t === "marche" ? "Consigne (facultatif)" : "Consigne (allure, sensations…)", "aria-label": nom + " : consigne", autocomplete: "off" });
+      const consigne = el("input", { id: prefixe + "-bloc-note-" + i, class: "bloc-consigne", placeholder: "Consigne (allure, sensations…)", "aria-label": nom + " : consigne", autocomplete: "off" });
       consigne.value = b.consigne || "";
-      consigne.addEventListener("input", () => { blocs[i].consigne = consigne.value.trim(); maj(); });
-      const retirer = el("button", { type: "button", class: "ghost retirer-bloc", "aria-label": "Retirer le " + nom.toLowerCase() }, "×");
-      retirer.addEventListener("click", () => { blocs.splice(i, 1); construireBlocs(); maj(); });
-      const ligne = el("div", { class: "bloc" + (b.t === "marche" ? " marche" : "") }, [
-        el("span", { class: "bloc-num" }, String(i + 1)), sorte,
-        el("div", { class: "temps" }, [min, el("span", {}, "min"), sec, el("span", {}, "s")]),
-        retirer, consigne,
+      consigne.hidden = !b.consigne;
+      consigne.addEventListener("input", () => { series[i].consigne = consigne.value.trim(); maj(); });
+      const outils = el("div", { class: "bloc-outils" }, [
+        iconeBouton(ICONE_CONSIGNE, "Consigne du " + nom.toLowerCase(), () => { consigne.hidden = false; consigne.focus(); }),
+        iconeBouton(ICONE_COPIER, "Dupliquer le " + nom.toLowerCase(), () => { series.splice(i + 1, 0, { ...series[i] }); construireBlocs(); maj(); }),
+        iconeBouton("<span aria-hidden=\"true\">×</span>", "Retirer le " + nom.toLowerCase(), () => { if (series.length > 1) { series.splice(i, 1); construireBlocs(); maj(); } }),
       ]);
-      return ligne;
+      return el("div", { class: "bloc" }, [el("span", { class: "bloc-num" }, String(i + 1)), caseDuree("c", "course"), caseDuree("r", "récup en marchant"), outils, consigne]);
     });
-    const ajouter = (t, d) => { const bAj = el("button", { type: "button", class: "ghost compact" }, "+ " + (t === "course" ? "Course" : "Marche")); bAj.addEventListener("click", () => { blocs.push({ t, d }); construireBlocs(); maj(); }); return bAj; };
+    const ajouter = el("button", { type: "button", class: "ghost compact" }, "+ Un bloc");
+    ajouter.addEventListener("click", () => { const dernier = series[series.length - 1] || { c: 600, r: 120 }; series.push({ c: dernier.c, r: dernier.r }); construireBlocs(); maj(); });
     zoneBlocs.replaceChildren(
-      el("span", { class: "label" }, "Les blocs"),
+      el("div", { class: "bloc bloc-entete", "aria-hidden": "true" }, [el("span", {}, ""), el("span", { class: "label" }, "Course"), el("span", { class: "label" }, "Récup (marche)"), el("span", {}, "")]),
       ...lignes,
-      el("div", { class: "actions" }, [ajouter("course", 600), ajouter("marche", 120)]),
+      el("div", { class: "actions" }, [ajouter]),
+      el("p", { class: "aide" }, "En minutes : « 10 », « 1:30 », ou « 45s » pour des secondes. Laisse la récup vide s'il n'y en a pas."),
     );
   }
 
   const cle = (c, t = type) => t + "-" + c.id;
   function valeurs() {
-    if (MODELES[type].blocs) return { blocs: blocsCourants().filter((b) => b.d > 0) };
+    if (MODELES[type].blocs) return { series: seriesCourantes().filter((b) => b.c > 0 || b.r > 0) };
     const v = {};
     (MODELES[type].champs || []).forEach((c) => {
       const brut = saisies[cle(c)] ?? c.defaut;
@@ -1934,7 +1976,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
       const m = MODELES[s.type];
       if (m && !m.libre && s.parametres) {
         (m.champs || []).forEach((c) => { if (s.parametres[c.id] != null) saisies[cle(c, s.type)] = s.parametres[c.id]; });
-        if (m.blocs) blocs = blocsDe(s.parametres).map((b) => ({ ...b }));
+        if (m.blocs) series = seriesDe(s.parametres).map((b) => ({ ...b }));
         ech.checked = !!s.parametres.echauffement;
         if (s.parametres.ech) reglagesEch[s.type] = { ...s.parametres.ech };
         texteModifie = !!s.parametres.texteModifie;
@@ -2590,6 +2632,10 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "3.4", nom: "Copier, coller", date: "2 novembre 2026", nouveautes: [
+    "Footing avec marche plus rapide à préparer : un bloc = la course et la récup en marchant, sur une seule ligne.",
+    "Un bouton pour dupliquer un bloc ; les blocs identiques s'écrivent « 3 × (10 min de course + 2 min de marche) ».",
+  ] },
   { num: "3.3", nom: "Ça grimpe", date: "2 novembre 2026", nouveautes: [
     "D+ et D− sur toutes les séances.",
     "Le footing fractionné devient « Footing avec marche » : des blocs de course et de marche, chacun avec sa durée et une consigne du coach.",
