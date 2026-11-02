@@ -761,7 +761,9 @@ button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
 .bouton-icone:hover { color: var(--ink); }
 
 /* Course ou vélo */
-.choix-sport { justify-self: start; min-width: 200px; }
+.choix-sport { display: flex; flex-wrap: wrap; gap: 6px; }
+.choix-sport button { background: transparent; color: var(--ink); border: 1px solid var(--line); padding: 7px 14px; font-size: 14px; font-weight: 600; }
+.choix-sport button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
 .type-chip.sport-velo { color: var(--ink); }
 
 /* Le prénom de Tomi en lettres d'or */
@@ -946,10 +948,22 @@ button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
             <legend class="label">Pour qui ? (une ou plusieurs personnes)</legend>
             <div id="destinataires"></div>
           </fieldset>
-          <div class="field" style="max-width:220px">
-            <label for="seance-date">Date</label>
-            <input id="seance-date" type="date">
-          </div>
+          <fieldset class="quand">
+            <legend class="label">Quand ?</legend>
+            <div class="choix-sport" role="group" aria-label="Quand" id="quand-choix">
+              <button type="button" data-quand="jour" aria-pressed="true">Un jour précis</button>
+              <button type="button" data-quand="semaine" aria-pressed="false">Dans la semaine</button>
+            </div>
+            <div class="field" id="quand-jour" style="max-width:220px">
+              <label for="seance-date" class="visuellement-cache">Date</label>
+              <input id="seance-date" type="date">
+            </div>
+            <div class="field" id="quand-semaine" style="max-width:320px" hidden>
+              <label for="seance-semaine" class="visuellement-cache">Semaine</label>
+              <select id="seance-semaine"></select>
+              <p class="aide">L'athlète choisit le jour ; la séance reste dans cette semaine-là.</p>
+            </div>
+          </fieldset>
 
           <div id="planif-modele"></div>
 
@@ -1180,7 +1194,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_CLE, {
 function verifier({ data, error }) { if (error) throw error; return data; }
 
 const CHAMPS_PROFIL = "id, prenom, nom, role, discipline, description, photo_url, couleur, objectif_km, objectif_seances, records, notifs";
-const CHAMPS_SEANCE = "id, cree_le, date, type, sport, parametres, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, d_plus, d_moins, duree_min, duree_s, forme, bpm_moy, bpm_max, reps_bpm, vo2max, photos, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
+const CHAMPS_SEANCE = "id, cree_le, date, toute_semaine, type, sport, parametres, titre, contenu, consignes, fait, fait_le, ressenti, commentaire, distance_km, d_plus, d_moins, duree_min, duree_s, forme, bpm_moy, bpm_max, reps_bpm, vo2max, photos, photo_url, coach_id, coach:profils!seances_coach_id_fkey(prenom, nom)";
 const CHAMPS_COMMENTAIRE = "id, texte, gif_url, cree_le, auteur_id, auteur:profils!commentaires_auteur_id_fkey(id, prenom, nom, photo_url, couleur)";
 const CHAMPS_FIL = CHAMPS_SEANCE
   + ", reactions(auteur_id, emoji)"
@@ -1766,12 +1780,12 @@ function dureeModele(m, v) { return m && m.remplitDuree && v ? (m.dureeTotale ? 
 function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = false, apercu: titreApercu = "Texte de la séance", surChangement = () => {} } = {}) {
   let type = MODELES[typeInitial] ? typeInitial : "footing";
   let sport = "course";
-  const boutonsSport = [["course", "Course"], ["velo", "Vélo"]].map(([v, nom]) => {
+  const boutonsSport = Object.entries(SPORTS).map(([v, nom]) => {
     const b = el("button", { type: "button", "aria-pressed": String(v === sport), "data-sport": v }, nom);
     b.addEventListener("click", () => { sport = v; majSport(); maj(); });
     return b;
   });
-  const choixSport = el("div", { class: "bascule petite choix-sport", role: "group", "aria-label": "Course ou vélo" }, boutonsSport);
+  const choixSport = el("div", { class: "choix-sport", role: "group", "aria-label": "Sport" }, boutonsSport);
   function majSport() { boutonsSport.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.sport === sport))); }
   const saisies = {}; // ce qui a été tapé, par type (gardé quand on change de type puis qu'on revient)
   const types = el("div", { class: "types" });
@@ -1971,7 +1985,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     choisir,
     // Recharge une séance enregistrée : avec ses réglages si on les a, sinon en « séance libre »
     charger(s) {
-      sport = s.sport === "velo" ? "velo" : "course";
+      sport = SPORTS[s.sport] ? s.sport : "course";
       majSport();
       const m = MODELES[s.type];
       if (m && !m.libre && s.parametres) {
@@ -1995,10 +2009,15 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
 }
 
 // En-tête d'une carte : date + type de séance
+// « Dans la semaine du 2 novembre » pour une séance sans jour précis
+function texteSemaine(lundiIso) {
+  const d = dateLocale(lundiIso);
+  return "Dans la semaine du " + d.toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+}
 function enTeteSeance(s) {
   return el("div", { class: "seance-haut" }, [
-    el("span", { class: "seance-date" }, formatDate(s.date)),
-    s.sport === "velo" ? el("span", { class: "type-chip sport-velo" }, "Vélo") : null,
+    el("span", { class: "seance-date" }, s.toute_semaine && s.date ? texteSemaine(s.date) : formatDate(s.date)),
+    s.sport && s.sport !== "course" && SPORTS[s.sport] ? el("span", { class: "type-chip sport-velo" }, SPORTS[s.sport]) : null,
     s.type && MODELES[s.type] && s.type !== "libre" ? el("span", { class: "type-chip" }, MODELES[s.type].nom) : null,
   ]);
 }
@@ -2016,15 +2035,17 @@ function lireNombre(texte) {
 function formatKm(km) {
   return (Math.round(km * 10) / 10).toLocaleString("fr-FR") + " km";
 }
+// Les sports possibles (les types de séance restent les mêmes)
+const SPORTS = { course: "Course", velo: "Vélo", ski_rando: "Ski de rando", rando: "Rando" };
 // Distance qui compte pour la course (le vélo ne s'ajoute pas aux kilomètres courus)
-function kmCourse(s) { return s.sport === "velo" ? 0 : Number(s.distance_km) || 0; }
+function kmCourse(s) { return s.sport && s.sport !== "course" ? 0 : Number(s.distance_km) || 0; }
 // Allure à afficher pour une séance : [valeur, unité], ou null
 //  - vélo : vitesse en km/h
 //  - footing fractionné : la distance comprend la marche, donc on prend la moyenne des allures des blocs
 //  - sinon : temps total ÷ distance
 function allureSeance(s) {
   const km = Number(s.distance_km) || 0, sec = dureeSec(s) || 0;
-  if (s.sport === "velo") return km && sec ? [(Math.round((km / (sec / 3600)) * 10) / 10).toLocaleString("fr-FR"), "km/h"] : null;
+  if (s.sport && s.sport !== "course") return km && sec ? [(Math.round((km / (sec / 3600)) * 10) / 10).toLocaleString("fr-FR"), "km/h"] : null;
   if (s.type === "footing_fractionne") {
     // Seulement les blocs courus (pas les récups) dont on connaît la durée et l'allure ; sinon, pas d'allure
     const courus = (Array.isArray(s.reps_bpm) ? s.reps_bpm : []).filter((r) => r && !r.recup && r.duree && r.allure);
@@ -2632,6 +2653,10 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "3.5", nom: "Hors piste", date: "2 novembre 2026", nouveautes: [
+    "Le coach peut donner une séance pour un jour précis ou « dans la semaine » : l'athlète choisit le jour en la validant.",
+    "Deux sports en plus : ski de rando et rando (affichés en km/h, sans compter dans les kilomètres de course).",
+  ] },
   { num: "3.4", nom: "Copier, coller", date: "2 novembre 2026", nouveautes: [
     "Footing avec marche plus rapide à préparer : un bloc = la course et la récup en marchant, sur une seule ligne.",
     "Un bouton pour dupliquer un bloc ; les blocs identiques s'écrivent « 3 × (10 min de course + 2 min de marche) ».",
@@ -3360,7 +3385,7 @@ function ouvrirPublier(existante = null) {
     ? (existante.coach_id === moi.id ? "Ta séance prévue" : "La séance " + de(nomComplet(existante.coach)))
     : proposee ? "Ta séance avec " + nomComplet(existante.par) : existante ? "Modifier ma séance" : "Une séance faite de ton côté";
   $("bouton-publier").textContent = duCoach || proposee ? "Valider ma séance" : existante ? "Enregistrer" : "Publier";
-  $("pub-date").value = existante ? (existante.date || (duCoach ? aujourdhui() : "")) : aujourdhui();
+  $("pub-date").value = existante ? (existante.toute_semaine || !existante.date ? (duCoach ? aujourdhui() : "") : existante.date) : aujourdhui();
   $("pub-commentaire").value = s.commentaire || "";
   effortPublier = champsEffort("pub", s);
   repsPublier = champsReps("pub-rep", nbRepsDe(s), s.reps_bpm, prevuRep(s.parametres, s.type));
@@ -3457,6 +3482,7 @@ $("form-publier").addEventListener("submit", async (event) => {
         }
         await donnees.majSeance(enModif.id, {
           ...(groupe_id && !groupeEnModif ? { groupe_id, principal: true } : {}),
+          ...(enModif.toute_semaine ? { toute_semaine: false } : {}), // le jour choisi devient la date de la séance
           ...commun,
           ressenti: ressentiPublier.valeur(), commentaire: $("pub-commentaire").value.trim() || null,
           ...forme, reps_bpm,
@@ -4059,11 +4085,43 @@ $("voir-profil-athlete").addEventListener("click", () => {
 /* ---------- Modifier une séance déjà envoyée ---------- */
 let seanceEnModif = null;
 
+/* « Un jour précis » ou « Dans la semaine » */
+let quandSemaine = false;
+function remplirSemaines(garder) {
+  const lundi = lundiDe(new Date());
+  const noms = ["Cette semaine", "Semaine prochaine", "Dans 2 semaines", "Dans 3 semaines"];
+  const fmt = (d) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  const options = noms.map((nom, k) => {
+    const debut = new Date(lundi); debut.setDate(debut.getDate() + 7 * k);
+    const fin = new Date(debut); fin.setDate(fin.getDate() + 6);
+    return el("option", { value: isoLocal(debut) }, nom + " (du " + fmt(debut) + " au " + fmt(fin) + ")");
+  });
+  // Une semaine déjà passée ou plus lointaine (séance qu'on modifie) : on l'ajoute à la liste
+  if (garder && !options.some((o) => o.value === garder)) options.unshift(el("option", { value: garder }, texteSemaine(garder)));
+  $("seance-semaine").replaceChildren(...options);
+  if (garder) $("seance-semaine").value = garder;
+}
+function choisirQuand(semaine) {
+  quandSemaine = semaine;
+  document.querySelectorAll("#quand-choix button").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.quand === "semaine") === semaine)));
+  $("quand-jour").hidden = semaine;
+  $("quand-semaine").hidden = !semaine;
+}
+document.querySelectorAll("#quand-choix button").forEach((b) => b.addEventListener("click", () => choisirQuand(b.dataset.quand === "semaine")));
+remplirSemaines();
+// La date à enregistrer : le jour choisi, ou le lundi de la semaine choisie
+function lireQuand() {
+  return quandSemaine
+    ? { date: $("seance-semaine").value || null, toute_semaine: true }
+    : { date: $("seance-date").value || null, toute_semaine: false };
+}
+
 // Charge la séance dans le formulaire : avec ses réglages (durée, répétitions…) si on les a, sinon en « séance libre »
 function commencerModif(s) {
   seanceEnModif = s;
   editeurPlanif.charger(s);
-  $("seance-date").value = s.date || "";
+  if (s.toute_semaine && s.date) { remplirSemaines(s.date); choisirQuand(true); }
+  else { $("seance-date").value = s.date || ""; choisirQuand(false); }
   $("seance-consignes").value = s.consignes || "";
   choixAthlete.disabled = true;
   $("bloc-destinataires").hidden = true;
@@ -4096,7 +4154,7 @@ $("form-seance").addEventListener("submit", async (event) => {
   afficherMessage("erreur-seance", "");
   const athlete = athletes.find((a) => a.id === choixAthlete.value);
   const { type: typeChoisi, sport, titre, contenu, parametres } = editeurPlanif.seance();
-  const date = $("seance-date").value || null;
+  const { date, toute_semaine } = lireQuand();
   const consignes = $("seance-consignes").value.trim() || null;
   if (!titre && !contenu) return afficherMessage("erreur-seance", "Donne au moins un titre ou un contenu à la séance.");
 
@@ -4105,7 +4163,7 @@ $("form-seance").addEventListener("submit", async (event) => {
       // En mode libre, on garde le type d'origine (footing, côtes…) pour l'étiquette
       const type = typeChoisi === "libre" ? (seanceEnModif.type || "libre") : typeChoisi;
       await pendant($("bouton-seance"), "Enregistrement…", () =>
-        donnees.majSeance(seanceEnModif.id, { date, type, sport, parametres, titre: titre || null, contenu: contenu || null, consignes }));
+        donnees.majSeance(seanceEnModif.id, { date, toute_semaine, type, sport, parametres, titre: titre || null, contenu: contenu || null, consignes }));
       finirModif();
       afficherMessage("ok-seance", "Séance modifiée.");
       afficherSeancesCoach();
@@ -4120,7 +4178,7 @@ $("form-seance").addEventListener("submit", async (event) => {
   try {
     // Une séance par personne : chacun la coche et donne son ressenti de son côté
     await pendant($("bouton-seance"), "Envoi…", () => donnees.envoyerSeance(ids.map((id) => ({
-      athlete_id: id, coach_id: moi.id, date, type: typeChoisi, sport, parametres,
+      athlete_id: id, coach_id: moi.id, date, toute_semaine, type: typeChoisi, sport, parametres,
       titre: titre || null, contenu: contenu || null, consignes,
     }))));
     const noms = ids.map((id) => { const a = athletes.find((x) => x.id === id); return a.estMoi ? "toi" : a.prenom; });
