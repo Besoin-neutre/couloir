@@ -745,6 +745,15 @@ button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
 .reps .est-recup { opacity: .55; }
 .reps .case-recup.est-recup { opacity: 1; }
 .reps-table tr.ligne-recup td { color: var(--muted); font-style: italic; }
+.reps.reps-marche { grid-template-columns: auto repeat(4, minmax(0, 1fr)) auto; }
+.table-marche { width: 100%; }
+.table-marche th, .table-marche td { padding: 6px 6px; }
+.table-marche td.col-marche, .table-marche th:last-child { text-align: center; }
+.table-wrap .table-marche th:last-child, .table-wrap .table-marche td:last-child { text-align: center; }
+.table-marche tr.ligne-recup td { font-style: normal; }
+.case-cochee, .case-vide { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 4px; font-size: 13px; font-weight: 800; font-style: normal; }
+.case-cochee { background: var(--auteur, var(--track)); color: #fff; }
+.case-vide { border: 1.5px solid color-mix(in srgb, var(--ink) 25%, transparent); }
 
 /* Footing avec marche : les blocs (course + récup sur une ligne) */
 .blocs { grid-column: 1 / -1; display: grid; gap: 6px; }
@@ -786,6 +795,104 @@ button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
   .wrap, .nav-int { max-width: 680px; }
   h2 { font-size: 48px; }
 }
+
+/* =========================================================
+   Mouvements et transitions (réglables dans « Essais » sur la page de test)
+   ========================================================= */
+:root { --duree: .28s; --dist: 8px; --courbe: cubic-bezier(.2, .8, .2, 1); --appui: .96; --decal: 40ms; }
+html[data-anim="dynamique"] { --duree: .45s; --dist: 22px; --courbe: cubic-bezier(.34, 1.45, .64, 1); --appui: .92; --decal: 70ms; }
+
+@keyframes entree { from { opacity: 0; transform: translateY(var(--dist)); } to { opacity: 1; transform: none; } }
+@keyframes fondu { from { opacity: 0; } to { opacity: 1; } }
+@keyframes zoom { from { opacity: 0; transform: scale(.94) translateY(var(--dist)); } to { opacity: 1; transform: none; } }
+@keyframes rebond { 0% { transform: scale(1); } 35% { transform: scale(1.35); } 65% { transform: scale(.92); } 100% { transform: scale(1); } }
+@keyframes saut { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-5px); } }
+@keyframes brille { from { background-position: -200px 0; } to { background-position: calc(200px + 100%) 0; } }
+@keyframes toast { from { opacity: 0; transform: translate(-50%, 16px) scale(.96); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* Boutons : ils s'enfoncent un peu quand on appuie */
+button, .bouton-fichier, .tuile, .reaction { transition: transform .14s var(--courbe), background-color .2s, color .2s, border-color .2s, box-shadow .2s, opacity .2s; }
+button:active:not([disabled]), .bouton-fichier:active { transform: scale(var(--appui)); }
+.choix-sport button, .bascule button, .types label, .choix-personnes label, .reaction { transition: transform .14s var(--courbe), background-color .2s, color .2s, border-color .2s; }
+.types label:active, .choix-personnes label:active { transform: scale(var(--appui)); }
+
+/* Changement d'onglet, ouverture des formulaires, fenêtres */
+#panneau-fil:not([hidden]), #panneau-semaine:not([hidden]), #panneau-planifier:not([hidden]), #panneau-trophees:not([hidden]), #panneau-profil:not([hidden]),
+#ecran-choix:not([hidden]), #ecran-creation:not([hidden]) { animation: entree var(--duree) var(--courbe) both; }
+#form-publier:not([hidden]), #filtre-fil-choix:not([hidden]), .mentions-suggestions:not([hidden]), .ech-details:not([hidden]) { animation: entree var(--duree) var(--courbe) both; }
+.modale-fond:not([hidden]) { animation: fondu .2s ease both; }
+.modale-fond:not([hidden]) > .modale { animation: zoom var(--duree) var(--courbe) both; }
+.visionneuse { animation: fondu .18s ease both; }
+.visionneuse img { animation: zoom var(--duree) var(--courbe) both; }
+
+/* Les séances du fil arrivent les unes après les autres */
+.fil > article { animation: entree var(--duree) var(--courbe) both; animation-delay: calc(var(--i, 0) * var(--decal)); }
+.com { animation: entree .22s var(--courbe) both; }
+
+/* Squelettes pendant le chargement */
+.squelette { display: grid; gap: 10px; padding: 16px; border-radius: 4px; background: var(--carte); }
+.sq-ligne, .sq-bloc { border-radius: 4px; background: linear-gradient(90deg, var(--line) 0, color-mix(in srgb, var(--line) 40%, var(--surface)) 50%, var(--line) 100%); background-size: 200px 100%; background-repeat: no-repeat; background-color: var(--line); animation: brille 1.2s ease-in-out infinite; }
+.sq-ligne { height: 14px; } .sq-ligne.court { width: 40%; } .sq-bloc { height: 70px; }
+
+/* Barre du bas : l'icône de l'onglet choisi fait un petit saut */
+.nav button svg { transition: transform .2s var(--courbe); }
+.nav button[aria-current="page"] svg { animation: saut .4s var(--courbe); }
+.nav button:active svg { transform: scale(.9); }
+
+/* Réaction ajoutée : rebond */
+.reaction.rebond span:first-child { display: inline-block; animation: rebond .45s var(--courbe); }
+
+/* Case « J'ai fait cette séance » */
+.cocher .case { transition: background-color .2s, border-color .2s, transform .2s var(--courbe); }
+.cocher:active .case { transform: scale(.85); }
+
+/* Petit message en bas de l'écran */
+.toast {
+  position: fixed; left: 50%; bottom: calc(92px + env(safe-area-inset-bottom, 0px)); z-index: 60;
+  transform: translateX(-50%); background: var(--ink); color: var(--surface);
+  padding: 10px 18px; border-radius: 999px; font-weight: 600; font-size: 14px; box-shadow: 0 6px 24px rgba(0,0,0,.18);
+  animation: toast var(--duree) var(--courbe) both; pointer-events: none; white-space: nowrap;
+}
+.toast.part { opacity: 0; transform: translate(-50%, 10px); transition: opacity .25s, transform .25s; }
+
+/* Survol sur ordinateur */
+@media (hover: hover) {
+  .seance.post { transition: box-shadow .25s, transform .25s var(--courbe); }
+  .seance.post:hover { box-shadow: 0 6px 24px rgba(0, 0, 0, .06); }
+  .tuile:hover { transform: translateY(-2px); }
+}
+
+/* Pas d'animation pour ceux qui les ont coupées sur leur téléphone, ou dans « Essais » */
+html[data-anim="aucune"] *, html[data-anim="aucune"] *::before { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+
+/* =========================================================
+   Variantes à essayer (« Essais », page de test)
+   ========================================================= */
+/* Cartes du fil */
+html[data-cartes="blanche"] .seance.post { background: var(--surface); box-shadow: inset 0 3px 0 var(--auteur, var(--line)), 0 0 0 1px var(--line); }
+html[data-cartes="blanche"] .seance.post .reaction, html[data-cartes="blanche"] .seance.post .chip, html[data-cartes="blanche"] .seance.post .pill { background: var(--carte); }
+html[data-cartes="contour"] .seance.post { background: transparent; box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--auteur, var(--line)) 60%, var(--surface)); }
+html[data-cartes="contour"] .seance.post .reaction, html[data-cartes="contour"] .seance.post .chip, html[data-cartes="contour"] .seance.post .pill { background: color-mix(in srgb, var(--auteur, var(--line)) 12%, var(--surface)); }
+/* Titres et gros chiffres droits plutôt qu'italiques */
+html[data-titres="droit"] h2, html[data-titres="droit"] .hello, html[data-titres="droit"] .logo, html[data-titres="droit"] .chiffre-bloc .nombre,
+html[data-titres="droit"] .stat, html[data-titres="droit"] .valeur, html[data-titres="droit"] .tuile-stat .chiffre, html[data-titres="droit"] .records .perf { font-style: normal; letter-spacing: -0.045em; }
+/* Coins arrondis */
+html[data-coins="ronds"] .card, html[data-coins="ronds"] .seance, html[data-coins="ronds"] .trophee, html[data-coins="ronds"] .squelette, html[data-coins="ronds"] .tuile-stat { border-radius: 18px; }
+html[data-coins="ronds"] input, html[data-coins="ronds"] select, html[data-coins="ronds"] textarea { border-radius: 12px; }
+html[data-coins="ronds"] .photo-seance { border-radius: 10px; }
+/* Fond crème (mode clair) */
+@media (prefers-color-scheme: light) {
+  html[data-fond="creme"] { --bg: #f3f0ea; --surface: #fffdf9; --carte: #ffffff; }
+  html[data-fond="creme"] body { background: var(--bg); }
+}
+
+/* Le panneau « Essais » (seulement sur la page de test) */
+.essais-bouton { position: fixed; right: max(14px, env(safe-area-inset-right, 0px)); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); z-index: 40; padding: 9px 14px; font-size: 13px; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
+.essais { position: fixed; left: 0; right: 0; bottom: 0; z-index: 55; background: var(--surface); color: var(--ink); border-radius: 18px 18px 0 0; box-shadow: 0 -10px 40px rgba(0,0,0,.18);
+  padding: 18px max(16px, env(safe-area-inset-left, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; max-width: 560px; margin: 0 auto; animation: entree var(--duree) var(--courbe) both; }
+.essais h3 { margin: 0; }
+.essais .ligne-essai { display: grid; gap: 6px; }
 </style>
 <!-- Bibliothèque officielle de Supabase (le « traducteur » entre le site et la base de données) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
@@ -2075,10 +2182,33 @@ function texteBpm(moy, max) {
   return "♥ " + [moy ? moy + " moy" : null, max ? max + " max" : null].filter(Boolean).join(" · ") + " bpm";
 }
 // BPM de chaque répétition, en petit tableau
-function tableauReps(reps) {
+function tableauReps(reps, type) {
   if (!Array.isArray(reps)) return null;
+  let dernier = reps.length - 1; // on n'affiche pas les dernières répétitions laissées vides
+  while (dernier > 0 && !reps[dernier]) dernier--;
+  reps = reps.slice(0, dernier + 1);
+  const valeur = (r, cle, texte) => el("td", {}, r && r[cle] ? texte(r) : "–");
+
+  // Footing avec marche : toujours les mêmes colonnes, et une case cochée pour la marche
+  if (type === "footing_fractionne") {
+    if (!reps.some((r) => r && (r.duree || r.allure || r.moy || r.max))) return null;
+    return el("div", { class: "table-wrap" }, el("table", { class: "reps-table table-marche" }, [
+      el("thead", {}, el("tr", {}, ["", "Temps", "Allure", "BPM moy.", "BPM max", "Marche"].map((t) => el("th", {}, t)))),
+      el("tbody", {}, reps.map((r, i) => el("tr", { class: r && r.recup ? "ligne-recup" : "" }, [
+        el("td", {}, String(i + 1)),
+        valeur(r, "duree", (x) => formatChrono(x.duree)),
+        valeur(r, "allure", (x) => formatAllure(x.allure)),
+        valeur(r, "moy", (x) => String(x.moy)),
+        valeur(r, "max", (x) => String(x.max)),
+        el("td", { class: "col-marche" }, r && r.recup
+          ? el("span", { class: "case-cochee", role: "img", "aria-label": "Marche" }, "✓")
+          : el("span", { class: "case-vide", role: "img", "aria-label": "Course" })),
+      ]))),
+    ]));
+  }
+
   const colonnes = [
-    { cle: "duree", nom: "Durée", texte: (r) => formatChrono(r.duree) },
+    { cle: "duree", nom: "Temps", texte: (r) => formatChrono(r.duree) },
     { cle: "allure", nom: "Allure", texte: (r) => formatAllure(r.allure) },
     { cle: "moy", nom: "BPM moy.", texte: (r) => String(r.moy) },
     { cle: "max", nom: "BPM max", texte: (r) => String(r.max) },
@@ -2086,13 +2216,10 @@ function tableauReps(reps) {
   if (!colonnes.length) return null;
   let numero = 0;
   const etiquette = (r) => (r && r.recup ? "Récup" : String(++numero));
-  let dernier = reps.length - 1; // on n'affiche pas les dernières répétitions laissées vides
-  while (dernier > 0 && !reps[dernier]) dernier--;
-  reps = reps.slice(0, dernier + 1);
   return el("div", { class: "table-wrap" }, el("table", { class: "reps-table" }, [
     el("thead", {}, el("tr", {}, [el("th", {}, "Rép."), ...colonnes.map((c) => el("th", {}, c.nom))])),
     el("tbody", {}, reps.map((r) => el("tr", { class: r && r.recup ? "ligne-recup" : "" }, [
-      el("td", {}, etiquette(r)), ...colonnes.map((c) => el("td", {}, r && r[c.cle] ? c.texte(r) : "–")),
+      el("td", {}, etiquette(r)), ...colonnes.map((c) => valeur(r, c.cle, c.texte)),
     ]))),
   ]));
 }
@@ -2116,7 +2243,7 @@ function etatEffort(s, debut = []) {
     texteBpm(s.bpm_moy, s.bpm_max) ? el("span", { class: "chip coeur" }, texteBpm(s.bpm_moy, s.bpm_max)) : null,
     s.vo2max ? el("span", { class: "chip" }, "VO2 max " + Number(s.vo2max).toLocaleString("fr-FR")) : null,
   ].filter(Boolean);
-  const reps = tableauReps(s.reps_bpm);
+  const reps = tableauReps(s.reps_bpm, s.type);
   if (!pastilles.length && !reps && !chiffres) return null;
   return el("div", { class: "effort" }, [chiffres, pastilles.length ? el("div", { class: "etat" }, pastilles) : null, reps]);
 }
@@ -2303,11 +2430,13 @@ function champsReps(prefixe, nb, existants = [], prevu = {}) {
     nbModele = n;
     const total = n === 0 ? 0 : Math.max(1, n + ajout);
     lignes = [];
-    grille.replaceChildren(...["", "Récup", "Durée", "Allure", "BPM moy", "BPM max"].map((t) => el("span", { class: "label" }, t)));
+    const marche = !!prevu.lignes; // footing avec marche
+    grille.classList.toggle("reps-marche", marche);
+    grille.replaceChildren(...(marche ? ["", "Temps", "Allure", "BPM moy", "BPM max", "Marche"] : ["", "Récup", "Temps", "Allure", "BPM moy", "BPM max"]).map((t) => el("span", { class: "label" }, t)));
     for (let i = 0; i < total; i++) {
       const g = gardes[i] || {};
       const nom = "Ligne " + (i + 1);
-      const recup = el("input", { type: "checkbox", id: prefixe + "-recup-" + i, "aria-label": nom + " : récupération (marche…)" });
+      const recup = el("input", { type: "checkbox", id: prefixe + "-recup-" + i, "aria-label": nom + (marche ? " : marche" : " : récupération (marche…)") });
       recup.checked = g.recup !== undefined ? g.recup : !!(prevuLigne(i) && prevuLigne(i).recup);
       const l = {
         recup,
@@ -2323,13 +2452,16 @@ function champsReps(prefixe, nb, existants = [], prevu = {}) {
       const majLigne = () => { [numero, cocheRecup, l.duree, l.allure, l.moy, l.max].forEach((c) => c.classList.toggle("est-recup", recup.checked)); allureAuto(l, i); };
       recup.addEventListener("change", majLigne);
       l.duree.addEventListener("input", () => allureAuto(l, i));
-      grille.append(numero, cocheRecup, l.duree, l.allure, l.moy, l.max);
+      if (marche) grille.append(numero, l.duree, l.allure, l.moy, l.max, cocheRecup);
+      else grille.append(numero, cocheRecup, l.duree, l.allure, l.moy, l.max);
       lignes.push(l);
       majLigne();
     }
     aide.textContent = prevu.distance
       ? "Durée comme « 1:18 » ; l'allure se calcule toute seule avec les " + prevu.distance + " m. Coche « Récup » pour une ligne de récupération."
-      : "Durée comme « 8:00 » (ou « 8 » pour 8 min) ; allure en min/km, comme « 4:05 ». Coche « Récup » pour la marche ou la récupération : elle ne compte pas dans l'allure.";
+      : prevu.lignes
+        ? "Temps comme « 8:00 » (ou « 8 » pour 8 min) ; allure en min/km, comme « 5:40 ». La case « Marche » est cochée pour les blocs de marche : ils ne comptent pas dans l'allure."
+        : "Temps comme « 8:00 » (ou « 8 » pour 8 min) ; allure en min/km, comme « 4:05 ». Coche « Récup » pour la marche ou la récupération : elle ne compte pas dans l'allure.";
     bloc.hidden = n === 0;
     moins.hidden = total <= 1;
   }
@@ -2660,6 +2792,12 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "3.7", nom: "Ça bouge", date: "3 novembre 2026", nouveautes: [
+    "Des transitions partout : changement d'onglet, ouverture des formulaires, fenêtres, séances du fil qui arrivent une à une.",
+    "Les boutons s'enfoncent quand on appuie, les réactions font un petit rebond, l'onglet choisi fait un petit saut.",
+    "Un message de confirmation apparaît en bas de l'écran quand une séance est publiée, validée ou envoyée.",
+    "Le fil affiche des formes grises animées pendant le chargement.",
+  ] },
   { num: "3.6", nom: "Semaine après semaine", date: "3 novembre 2026", nouveautes: [
     "Dans le profil, le bilan « 7 derniers jours » devient une vraie semaine, du lundi au dimanche ; les flèches permettent de remonter les semaines précédentes.",
     "Le calendrier passe en haut du profil, les notifications tout en bas.",
@@ -3133,12 +3271,12 @@ function zoneReactions(s) {
     });
   }
 
-  function rendre() {
+  function rendre(rebond = null) {
     zone.replaceChildren(...Object.entries(REACTIONS).map(([cle, r]) => {
       const qui = prenomsDe(cle);
       const aMoi = moi && liste.some((x) => x.emoji === cle && x.auteur_id === moi.id);
       const b = el("button", {
-        type: "button", class: "reaction" + (aMoi ? " active" : ""), "aria-pressed": String(!!aMoi),
+        type: "button", class: "reaction" + (aMoi ? " active" : "") + (rebond === cle ? " rebond" : ""), "aria-pressed": String(!!aMoi),
         title: qui.length ? r.nom + " : " + qui.join(", ") : r.nom,
         "aria-label": r.nom + (qui.length ? ", " + qui.length : ""),
       }, [el("span", { "aria-hidden": "true" }, r.emoji), qui.length ? el("span", { class: "nb" }, String(qui.length)) : null]);
@@ -3158,7 +3296,7 @@ function zoneReactions(s) {
     // Affichage immédiat, puis enregistrement
     if (aMoi) liste.splice(liste.findIndex((x) => x.emoji === cle && x.auteur_id === moi.id), 1);
     else liste.push({ emoji: cle, auteur_id: moi.id });
-    rendre();
+    rendre(aMoi ? null : cle);
     try {
       if (aMoi) await donnees.retirerReaction(s.id, moi.id, cle);
       else await donnees.reagir(s.id, moi.id, cle);
@@ -3347,7 +3485,9 @@ async function chargerFil(depuisLeDebut, avecPropositions = true) {
     if (avecPropositions) afficherPropositions();
     dernierJourFil = null;
     pageFil = 0;
-    liste.replaceChildren(el("p", { class: "muted" }, "Chargement du fil…"));
+    liste.replaceChildren(...[0, 1, 2].map(() => el("div", { class: "squelette", "aria-hidden": "true" }, [
+      el("div", { class: "sq-ligne court" }), el("div", { class: "sq-ligne" }), el("div", { class: "sq-bloc" }),
+    ])), el("p", { class: "visuellement-cache" }, "Chargement du fil…"));
   }
   try {
     const de = pageFil * PAR_PAGE;
@@ -3365,7 +3505,9 @@ async function chargerFil(depuisLeDebut, avecPropositions = true) {
         liste.append(el("div", { class: "separateur-date", role: "heading", "aria-level": "3" }, el("span", {}, libelleJour(jour))));
         dernierJourFil = jour;
       }
-      liste.append(carteFil(s));
+      const carte = carteFil(s);
+      carte.style.setProperty("--i", String(Math.min(liste.querySelectorAll("article").length, 8)));
+      liste.append(carte);
     });
     $("fil-plus").hidden = posts.length < PAR_PAGE;
     pageFil++;
@@ -3513,6 +3655,7 @@ $("form-publier").addEventListener("submit", async (event) => {
       fermerPublier();
       chargerFil(true);
       majPastilles();
+      toast(enModif.fait ? "Séance enregistrée ✓" : "Séance validée ✓");
       return;
     }
     const avec = choixAvec ? choixAvec.valeurs() : [];
@@ -3538,6 +3681,7 @@ $("form-publier").addEventListener("submit", async (event) => {
     });
     fermerPublier();
     chargerFil(true);
+    toast("Séance publiée ✓");
   } catch (e) {
     afficherMessage("erreur-publier", messageErreur(e));
   }
@@ -4195,6 +4339,7 @@ $("form-seance").addEventListener("submit", async (event) => {
     const noms = ids.map((id) => { const a = athletes.find((x) => x.id === id); return a.estMoi ? "toi" : a.prenom; });
     const liste = noms.length > 1 ? noms.slice(0, -1).join(", ") + " et " + noms[noms.length - 1] : noms[0];
     afficherMessage("ok-seance", "Séance envoyée à " + liste + ".");
+    toast("Envoyée à " + liste + " ✓");
     // La liste du bas montre tout le monde si la personne affichée n'était pas dans l'envoi
     if (choixAthlete.value !== "tous" && !ids.includes(choixAthlete.value)) choixAthlete.value = "tous";
     afficherSeancesCoach();
@@ -5021,6 +5166,58 @@ try {
   Object.keys(localStorage).filter((k) => k.startsWith("sb-")).forEach((k) => localStorage.removeItem(k));
 } catch (e) {}
 afficherChoix();
+
+/* ---------- Petit message en bas de l'écran ---------- */
+function toast(texte) {
+  const t = el("div", { class: "toast", role: "status" }, texte);
+  document.body.append(t);
+  setTimeout(() => { t.classList.add("part"); setTimeout(() => t.remove(), 300); }, 1900);
+}
+
+/* ---------- Essais de DA : seulement sur la page de test ---------- */
+const REGLAGES_DA = {
+  anim: { nom: "Animations", choix: { douce: "Douces", dynamique: "Dynamiques", aucune: "Aucune" } },
+  cartes: { nom: "Séances du fil", choix: { teinte: "Teintées", blanche: "Blanches + liseré", contour: "Contour" } },
+  titres: { nom: "Titres et chiffres", choix: { italique: "Italique", droit: "Droit" } },
+  coins: { nom: "Coins", choix: { carres: "Carrés", ronds: "Arrondis" } },
+  fond: { nom: "Fond (mode clair)", choix: { blanc: "Blanc", creme: "Crème" } },
+};
+function appliquerReglagesDA() {
+  Object.keys(REGLAGES_DA).forEach((k) => {
+    let v = null;
+    try { v = localStorage.getItem("couloir-da-" + k); } catch (e) {}
+    if (v && REGLAGES_DA[k].choix[v]) document.documentElement.dataset[k] = v; else delete document.documentElement.dataset[k];
+  });
+}
+if (/test/i.test(location.pathname)) {
+  appliquerReglagesDA();
+  const ouvrir = el("button", { type: "button", class: "essais-bouton" }, "🎨 Essais");
+  document.body.append(ouvrir);
+  ouvrir.addEventListener("click", () => {
+    if (document.querySelector(".essais")) return;
+    const fermer = el("button", { type: "button", class: "ghost compact" }, "Fermer");
+    const lignes = Object.entries(REGLAGES_DA).map(([k, r]) => {
+      const actuel = document.documentElement.dataset[k] || Object.keys(r.choix)[0];
+      const boutons = Object.entries(r.choix).map(([v, nom]) => {
+        const b = el("button", { type: "button", "aria-pressed": String(v === actuel) }, nom);
+        b.addEventListener("click", () => {
+          try { localStorage.setItem("couloir-da-" + k, v); } catch (e) {}
+          appliquerReglagesDA();
+          boutons.forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+        });
+        return b;
+      });
+      return el("div", { class: "ligne-essai" }, [el("span", { class: "label" }, r.nom), el("div", { class: "choix-sport" }, boutons)]);
+    });
+    const panneau = el("div", { class: "essais", role: "dialog", "aria-label": "Essais de DA" }, [
+      el("div", { class: "entete-panneau" }, [el("h3", {}, "Essais de DA"), fermer]),
+      ...lignes,
+      el("p", { class: "aide" }, "Teste les combinaisons sur ton téléphone, puis dis-moi celle que tu préfères : elle deviendra la version pour tout le monde."),
+    ]);
+    fermer.addEventListener("click", () => panneau.remove());
+    document.body.append(panneau);
+  });
+}
 </script>
 </body>
 </html>
