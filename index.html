@@ -774,6 +774,23 @@ button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
 .entete-semaine-bilan button { min-width: 44px; min-height: 40px; padding: 6px 12px; }
 .entete-semaine-bilan h3 { margin-bottom: 2px; }
 
+/* Séances par séries */
+.lots { grid-column: 1 / -1; display: grid; gap: 8px; }
+.lot { display: grid; gap: 6px; padding: 10px; background: var(--surface); border-radius: 12px; }
+.lot-ligne { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lot-ligne input { width: 58px; text-align: center; padding: 9px 4px; font-weight: 600; }
+.lot-ligne input.lot-nb { width: 44px; }
+.lot-ligne select { width: auto; padding: 8px 4px; font-size: 15px; }
+.lot-ligne .bloc-outils { margin-left: auto; }
+.lot-fois { font-weight: 700; }
+.lot-etiquette { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.lot-ligne2 .lot-etiquette:nth-of-type(2) { margin-left: 6px; }
+.lot-autre { width: 100%; }
+.lot-R { padding: 0 2px; }
+.rep-nom { display: grid; justify-items: center; line-height: 1.1; }
+.rep-cible { font-size: 9px; font-weight: 700; letter-spacing: .04em; color: var(--track); }
+.reps-table .col-cible { font-size: 12px; font-weight: 700; color: var(--auteur, var(--track)); }
+
 /* Course ou vélo */
 .choix-sport { display: flex; flex-wrap: wrap; gap: 6px; }
 .choix-sport button { background: transparent; color: var(--ink); border: 1px solid var(--line); padding: 7px 14px; font-size: 14px; font-weight: 600; }
@@ -886,6 +903,8 @@ html[data-coins="ronds"] .photo-seance { border-radius: 10px; }
   html[data-fond="creme"] { --bg: #f3f0ea; --surface: #fffdf9; --carte: #ffffff; }
   html[data-fond="creme"] body { background: var(--bg); }
 }
+
+
 
 </style>
 <!-- Bibliothèque officielle de Supabase (le « traducteur » entre le site et la base de données) -->
@@ -1006,6 +1025,9 @@ html[data-coins="ronds"] .photo-seance { border-radius: 10px; }
           <p class="label">Voir les séances de…</p>
           <div id="filtre-fil-personnes"></div>
           <div class="choix-rapides"><button type="button" class="lien petit" id="filtre-fil-tous">Tout le monde</button></div>
+          <p class="label">Type de séance</p>
+          <div id="filtre-fil-types" class="choix-sport" role="group" aria-label="Types de séance à afficher"></div>
+          <div class="choix-rapides"><button type="button" class="lien petit" id="filtre-fil-tous-types">Tous les types</button></div>
         </div>
       </div>
       <div class="fil" id="fil-liste"></div>
@@ -1381,9 +1403,10 @@ const donnees = {
   // Le fil montre chaque séance faite, y compris la version de chaque personne d'une séance à plusieurs
   // (elle apparaît quand la personne la valide, avec ses propres photos, BPM, commentaire…)
   // personnes : n'afficher que leurs séances
-  async fil(de, a, personnes = []) {
+  async fil(de, a, personnes = [], types = []) {
     let requete = sb.from("seances").select(CHAMPS_FIL + ", groupe_id, principal").eq("fait", true);
     if (personnes.length) requete = requete.in("athlete_id", personnes);
+    if (types.length) requete = requete.in("type", types);
     const posts = verifier(await requete.order("fait_le", { ascending: false }).range(de, a));
     const groupes = [...new Set(posts.filter((p) => p.groupe_id).map((p) => p.groupe_id))];
     if (groupes.length) {
@@ -1751,33 +1774,35 @@ const MODELES = {
     titre: (v) => "Sortie longue " + enDuree(v.duree),
     corps: (v) => enDuree(v.duree) + " à allure régulière et confortable",
   },
+  // Séances « par séries » : chaque série = nb × (temps ou distance) à une allure cible, avec sa récup
   fractionne: {
     nom: "Fractionné",
     echauffement: ECHAUFFEMENT,
-    champs: [
-      { id: "series", label: "Nombre de séries", defaut: 2 },
-      { id: "reps", label: "Répétitions par série", defaut: 5 },
-      { id: "distance", label: "Distance", unite: "m", defaut: 400 },
-      { id: "recup", label: "Récup entre répétitions", temps: true, defaut: 60 },
-      { id: "recupSerie", label: "Récup entre séries", temps: true, defaut: 3 * 60 },
-    ],
-    nbReps: (v) => v.series * v.reps,
-    titre: (v) => "Fractionné " + blocSeries(v, v.distance + " m"),
-    corps: (v) => blocSeries(v, v.distance + " m") + ", r = " + enDuree(v.recup) + (v.series > 1 ? ", R = " + enDuree(v.recupSerie) : ""),
+    lots: { allures: ["", "VMA", "AS5K", "AS10K", "AS21K", "AS42K", "SV1", "SV2", "autre"],
+      defaut: [{ n: 5, e: 400, u: "m", a: "", r: 60, ru: "min" }, { n: 5, e: 400, u: "m", a: "", r: 60, ru: "min" }] },
+    champs: [],
+    nbReps: (v) => lotsDe(v, "fractionne").reduce((t, l) => t + l.n, 0),
+    titre: (v) => titreLots("Fractionné", lotsDe(v, "fractionne")),
+    corps: (v) => corpsLots(lotsDe(v, "fractionne"), recupSeriesDe(v), ""),
   },
   seuil: {
     nom: "Seuil",
     echauffement: ECHAUFFEMENT,
-    nbReps: (v) => v.series * v.reps,
-    champs: [
-      { id: "series", label: "Nombre de séries", defaut: 1 },
-      { id: "reps", label: "Répétitions par série", defaut: 3 },
-      { id: "duree", label: "Durée de chaque répétition", temps: true, defaut: 8 * 60 },
-      { id: "recup", label: "Récup entre répétitions", temps: true, defaut: 2 * 60 },
-      { id: "recupSerie", label: "Récup entre séries", temps: true, defaut: 4 * 60 },
-    ],
-    titre: (v) => "Seuil " + blocSeries(v, enDuree(v.duree)),
-    corps: (v) => blocSeries(v, enDuree(v.duree)) + " à allure seuil, r = " + enDuree(v.recup) + (v.series > 1 ? ", R = " + enDuree(v.recupSerie) : ""),
+    lots: { allures: ["SV1", "SV2"], defaut: [{ n: 3, e: 480, u: "min", a: "SV1", r: 120, ru: "min" }] },
+    champs: [],
+    nbReps: (v) => lotsDe(v, "seuil").reduce((t, l) => t + l.n, 0),
+    titre: (v) => titreLots("Seuil", lotsDe(v, "seuil")),
+    corps: (v) => corpsLots(lotsDe(v, "seuil"), recupSeriesDe(v), "allure seuil"),
+  },
+  mixte: {
+    nom: "Séance mixte",
+    echauffement: ECHAUFFEMENT,
+    lots: { allures: ["SV1", "SV2", "AS10K", "AS21K", "AS42K", "autre"],
+      defaut: [{ n: 2, e: 600, u: "min", a: "AS21K", r: 90, ru: "min" }, { n: 4, e: 1000, u: "m", a: "AS10K", r: 60, ru: "min" }] },
+    champs: [],
+    nbReps: (v) => lotsDe(v, "mixte").reduce((t, l) => t + l.n, 0),
+    titre: (v) => titreLots("Séance mixte", lotsDe(v, "mixte")),
+    corps: (v) => corpsLots(lotsDe(v, "mixte"), recupSeriesDe(v), ""),
   },
   cotes: {
     nom: "Côtes",
@@ -1815,6 +1840,54 @@ const MODELES = {
 function blocSeries(v, effort) {
   const base = v.reps + " × " + effort;
   return v.series > 1 ? v.series + " × (" + base + ")" : base;
+}
+// ---- Séances par séries (fractionné, seuil, séance mixte) ----
+// Une série : { n: répétitions, e: effort (secondes si u = "min", mètres si u = "m" ou "km"), u, a: allure cible, at: allure libre,
+//               r: récup entre répétitions (secondes si ru = "min", mètres si ru = "m"), ru }
+const NOMS_ALLURES = { "": "—", VMA: "VMA", AS5K: "AS5K", AS10K: "AS10K", AS21K: "AS21K", AS42K: "AS42K", SV1: "SV1", SV2: "SV2", autre: "Autre…" };
+function lotsDe(v, type) {
+  if (v && Array.isArray(v.lots) && v.lots.length) return v.lots;
+  // Anciennes séances : « 2 × (5 × 400 m) » ou « 3 × 8 min »
+  if (v && v.reps && (v.distance || v.duree)) {
+    const l = v.distance ? { n: v.reps, e: v.distance, u: "m" } : { n: v.reps, e: v.duree, u: "min" };
+    return Array.from({ length: v.series || 1 }, () => ({ ...l, a: "", r: v.recup || 0, ru: "min" }));
+  }
+  return (MODELES[type] && MODELES[type].lots ? MODELES[type].lots.defaut : []).map((l) => ({ ...l }));
+}
+function recupSeriesDe(v) {
+  if (v && v.R) return v.R;
+  return v && v.recupSerie ? { e: v.recupSerie, u: "min" } : { e: 180, u: "min" };
+}
+function texteMesure(e, u) {
+  if (!e) return "";
+  if (u === "min") return enDuree(e);
+  if (u === "km") return (Math.round(e / 10) / 100).toLocaleString("fr-FR") + " km";
+  return e + " m";
+}
+function cibleDe(l) { return l.a === "autre" ? (l.at || "").trim() : l.a || ""; }
+// Les séries identiques qui se suivent sont regroupées : « 2 × (5 × 400 m) »
+function groupesLots(lots) {
+  const res = [];
+  lots.forEach((l) => {
+    const d = res[res.length - 1];
+    if (d && JSON.stringify(d.l) === JSON.stringify(l)) d.k++; else res.push({ k: 1, l });
+  });
+  return res;
+}
+function titreLots(nom, lots) {
+  return nom + " " + groupesLots(lots).map(({ k, l }) => {
+    const t = l.n + " × " + texteMesure(l.e, l.u) + (cibleDe(l) ? " " + cibleDe(l) : "");
+    return k > 1 ? k + " × (" + t + ")" : t;
+  }).join(" + ");
+}
+function corpsLots(lots, R, cibleParDefaut) {
+  const lignes = groupesLots(lots).map(({ k, l }) => {
+    const cible = cibleDe(l) || cibleParDefaut;
+    const t = l.n + " × " + texteMesure(l.e, l.u) + (cible ? " à " + cible : "") + (l.r ? ", r = " + texteMesure(l.r, l.ru) : "");
+    return k > 1 ? k + " × (" + t + ")" : t;
+  });
+  if (lots.length > 1 && R && R.e) lignes.push("R = " + texteMesure(R.e, R.u) + " entre les séries");
+  return lignes.join("\n");
 }
 // Nombre de répétitions d'une séance enregistrée (0 pour un footing, un renfo…)
 function nbRepsDe(s) {
@@ -1876,7 +1949,13 @@ function texteDureeBloc(sec) {
 // et, pour un footing avec marche, chaque ligne (course ou récup, et sa durée)
 function prevuRep(v, type) {
   if (type === "footing_fractionne" || (v && (Array.isArray(v.blocs) || Array.isArray(v.series)))) {
-    return { distance: null, duree: null, lignes: blocsDe(v).map((b) => ({ recup: b.t === "marche", duree: b.d || null })) };
+    return { distance: null, duree: null, marche: true, lignes: blocsDe(v).map((b) => ({ recup: b.t === "marche", duree: b.d || null })) };
+  }
+  // Séances par séries : une ligne par répétition, avec son temps ou sa distance et son allure cible
+  if ((MODELES[type] && MODELES[type].lots) || (v && Array.isArray(v.lots))) {
+    return { distance: null, duree: null, lignes: lotsDe(v, type).flatMap((l) => Array.from({ length: l.n }, () => ({
+      recup: false, duree: l.u === "min" ? l.e : null, distance: l.u !== "min" ? l.e : null, cible: cibleDe(l),
+    }))) };
   }
   return { distance: Number(v && v.distance) || null, duree: Number(v && v.duree) || null };
 }
@@ -1885,6 +1964,7 @@ function dureeModele(m, v) { return m && m.remplitDuree && v ? (m.dureeTotale ? 
 
 /* Éditeur « type de séance + champs préremplis », pour le coach et pour les athlètes.
    surChangement(type, valeurs) est appelé à chaque modification. */
+let ICONE_COPIER = "";
 function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = false, apercu: titreApercu = "Texte de la séance", surChangement = () => {} } = {}) {
   let type = MODELES[typeInitial] ? typeInitial : "footing";
   let sport = "course";
@@ -1955,7 +2035,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
   // Footing avec marche : des blocs « course + récup en marchant », qu'on peut dupliquer
   let series = null;
   const zoneBlocs = el("div", { class: "blocs" });
-  const ICONE_COPIER = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
+  ICONE_COPIER = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>';
   const ICONE_CONSIGNE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
   function seriesCourantes() { return (series || MODELES.footing_fractionne.defautSeries).map((b) => ({ ...b })); }
   function construireBlocs() {
@@ -1995,8 +2075,83 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     );
   }
 
+  // Séances par séries : une ligne par série (nb × effort, unité, allure cible, récup), qu'on peut dupliquer
+  const lotsParType = {}, recupSeriesParType = {};
+  const zoneLots = el("div", { class: "lots" });
+  const lotsCourants = (t = type) => (lotsParType[t] || lotsDe(null, t)).map((l) => ({ ...l }));
+  const recupSeriesCourante = (t = type) => ({ ...(recupSeriesParType[t] || { e: 180, u: "min" }) });
+  function lireMesure(texte, u) {
+    const t = String(texte || "").trim().replace(",", ".");
+    if (!t) return 0;
+    if (u === "min") return lireDureeBloc(t);
+    const n = Number(t.replace(/\s*(km|m)$/i, ""));
+    if (!Number.isFinite(n) || n < 0) return NaN;
+    return Math.round(u === "km" ? n * 1000 : n);
+  }
+  const ecrireMesure = (e, u) => (!e ? "" : u === "min" ? texteDureeBloc(e) : u === "km" ? String(Math.round(e / 10) / 100).replace(".", ",") : String(e));
+  function construireLots() {
+    const lots = lotsCourants();
+    lotsParType[type] = lots;
+    const conf = MODELES[type].lots;
+    const champMesure = (i, cle, cleU, unites, label) => {
+      const inp = el("input", { type: "text", inputmode: "decimal", id: prefixe + "-lot-" + cle + "-" + i, "aria-label": label, autocomplete: "off", placeholder: "0" });
+      const sel = el("select", { id: prefixe + "-lot-" + cleU + "-" + i, "aria-label": label + " : unité" }, unites.map(([v, t]) => el("option", { value: v }, t)));
+      inp.value = ecrireMesure(lots[i][cle], lots[i][cleU]);
+      sel.value = lots[i][cleU];
+      const lireEtMaj = () => { const v = lireMesure(inp.value, sel.value); inp.classList.toggle("invalide", Number.isNaN(v)); lots[i][cle] = Number.isNaN(v) ? 0 : v; lots[i][cleU] = sel.value; maj(); };
+      inp.addEventListener("input", lireEtMaj); sel.addEventListener("change", lireEtMaj);
+      return [inp, sel];
+    };
+    const lignes = lots.map((l, i) => {
+      const nom = "Série " + (i + 1);
+      const nb = el("input", { type: "text", inputmode: "numeric", id: prefixe + "-lot-n-" + i, "aria-label": nom + " : nombre de répétitions", class: "lot-nb", autocomplete: "off" });
+      nb.value = String(l.n || "");
+      nb.addEventListener("input", () => { const n = parseInt(nb.value, 10); lots[i].n = n > 0 && n <= 50 ? n : 0; maj(); });
+      const [effort, uniteEffort] = champMesure(i, "e", "u", [["min", "min"], ["m", "m"], ["km", "km"]], nom + " : temps ou distance de chaque répétition");
+      const allure = el("select", { id: prefixe + "-lot-a-" + i, "aria-label": nom + " : allure cible" }, conf.allures.map((a) => el("option", { value: a }, NOMS_ALLURES[a])));
+      allure.value = conf.allures.includes(l.a) ? l.a : conf.allures[0];
+      lots[i].a = allure.value;
+      const autre = el("input", { id: prefixe + "-lot-at-" + i, "aria-label": nom + " : allure", placeholder: "Allure (ex. 4:10 /km)", autocomplete: "off", class: "lot-autre" });
+      autre.value = l.at || "";
+      autre.hidden = allure.value !== "autre";
+      allure.addEventListener("change", () => { lots[i].a = allure.value; autre.hidden = allure.value !== "autre"; if (!autre.hidden) autre.focus(); maj(); });
+      autre.addEventListener("input", () => { lots[i].at = autre.value; maj(); });
+      const [recup, uniteRecup] = champMesure(i, "r", "ru", [["min", "min"], ["m", "m"]], nom + " : récup entre les répétitions");
+      const icone = (svg, label, action) => { const b = el("button", { type: "button", class: "ghost bouton-icone", "aria-label": label, title: label }); b.innerHTML = svg; b.addEventListener("click", action); return b; };
+      const outils = el("div", { class: "bloc-outils" }, [
+        icone(ICONE_COPIER, "Dupliquer la " + nom.toLowerCase(), () => { lots.splice(i + 1, 0, { ...lots[i] }); construireLots(); maj(); }),
+        icone("<span aria-hidden=\"true\">×</span>", "Retirer la " + nom.toLowerCase(), () => { if (lots.length > 1) { lots.splice(i, 1); construireLots(); maj(); } }),
+      ]);
+      return el("div", { class: "lot" }, [
+        el("div", { class: "lot-ligne" }, [el("span", { class: "bloc-num" }, String(i + 1)), nb, el("span", { class: "lot-fois" }, "×"), effort, uniteEffort, outils]),
+        el("div", { class: "lot-ligne lot-ligne2" }, [
+          el("label", { class: "lot-etiquette", for: allure.id }, "Allure"), allure,
+          el("label", { class: "lot-etiquette", for: recup.id }, "Récup"), recup, uniteRecup,
+        ]),
+        autre,
+      ]);
+    });
+    const ajouter = el("button", { type: "button", class: "ghost compact" }, "+ Une série");
+    ajouter.addEventListener("click", () => { lots.push({ ...lots[lots.length - 1] }); construireLots(); maj(); });
+    const R = recupSeriesCourante();
+    recupSeriesParType[type] = R;
+    const rIn = el("input", { type: "text", inputmode: "decimal", id: prefixe + "-lot-R", autocomplete: "off", placeholder: "0" });
+    const rU = el("select", { id: prefixe + "-lot-RU", "aria-label": "Récup entre les séries : unité" }, [el("option", { value: "min" }, "min"), el("option", { value: "m" }, "m")]);
+    rIn.value = ecrireMesure(R.e, R.u); rU.value = R.u;
+    const lireR = () => { const v = lireMesure(rIn.value, rU.value); R.e = Number.isNaN(v) ? 0 : v; R.u = rU.value; maj(); };
+    rIn.addEventListener("input", lireR); rU.addEventListener("change", lireR);
+    zoneLots.replaceChildren(
+      el("span", { class: "label" }, "Les séries"),
+      ...lignes,
+      el("div", { class: "actions" }, [ajouter]),
+      lots.length > 1 ? el("div", { class: "lot-ligne lot-R" }, [el("label", { class: "lot-etiquette", for: rIn.id }, "Récup entre les séries"), rIn, rU]) : null,
+      el("p", { class: "aide" }, "Temps : « 8 » = 8 min, « 1:30 », « 45s ». Distance en mètres (« 400 ») ou en km (« 1,5 »). La récup peut être un temps ou une distance (trot)."),
+    );
+  }
+
   const cle = (c, t = type) => t + "-" + c.id;
   function valeurs() {
+    if (MODELES[type].lots) return { lots: lotsCourants().filter((l) => l.n > 0 && l.e > 0), R: recupSeriesCourante() };
     if (MODELES[type].blocs) return { series: seriesCourantes().filter((b) => b.c > 0 || b.r > 0) };
     const v = {};
     (MODELES[type].champs || []).forEach((c) => {
@@ -2051,6 +2206,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     optionEch.hidden = !m.echauffement;
     if (m.echauffement) construireEch();
     if (m.blocs) { construireBlocs(); champs.replaceChildren(zoneBlocs); maj(); return; }
+    if (m.lots) { construireLots(); champs.replaceChildren(zoneLots); maj(); return; }
     champs.replaceChildren(...(m.champs || []).map((c) => {
       const id = prefixe + "-" + type + "-" + c.id;
       if (c.temps) {
@@ -2099,6 +2255,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
       if (m && !m.libre && s.parametres) {
         (m.champs || []).forEach((c) => { if (s.parametres[c.id] != null) saisies[cle(c, s.type)] = s.parametres[c.id]; });
         if (m.blocs) series = seriesDe(s.parametres).map((b) => ({ ...b }));
+        if (m.lots) { lotsParType[s.type] = lotsDe(s.parametres, s.type).map((l) => ({ ...l })); recupSeriesParType[s.type] = { ...recupSeriesDe(s.parametres) }; }
         ech.checked = !!s.parametres.echauffement;
         if (s.parametres.ech) reglagesEch[s.type] = { ...s.parametres.ech };
         texteModifie = !!s.parametres.texteModifie;
@@ -2176,7 +2333,7 @@ function texteBpm(moy, max) {
   return "♥ " + [moy ? moy + " moy" : null, max ? max + " max" : null].filter(Boolean).join(" · ") + " bpm";
 }
 // BPM de chaque répétition, en petit tableau
-function tableauReps(reps, type) {
+function tableauReps(reps, type, parametres) {
   if (!Array.isArray(reps)) return null;
   let dernier = reps.length - 1; // on n'affiche pas les dernières répétitions laissées vides
   while (dernier > 0 && !reps[dernier]) dernier--;
@@ -2210,11 +2367,19 @@ function tableauReps(reps, type) {
   if (!colonnes.length) return null;
   let numero = 0;
   const etiquette = (r) => (r && r.recup ? "Récup" : String(++numero));
+  // Allure cible de chaque répétition (séances par séries)
+  const cibles = MODELES[type] && MODELES[type].lots && parametres
+    ? lotsDe(parametres, type).flatMap((l) => Array.from({ length: l.n }, () => cibleDe(l))) : [];
+  const avecCible = cibles.some(Boolean);
+  let k = 0;
   return el("div", { class: "table-wrap" }, el("table", { class: "reps-table" }, [
-    el("thead", {}, el("tr", {}, [el("th", {}, "Rép."), ...colonnes.map((c) => el("th", {}, c.nom))])),
-    el("tbody", {}, reps.map((r) => el("tr", { class: r && r.recup ? "ligne-recup" : "" }, [
-      el("td", {}, etiquette(r)), ...colonnes.map((c) => valeur(r, c.cle, c.texte)),
-    ]))),
+    el("thead", {}, el("tr", {}, [el("th", {}, "Rép."), avecCible ? el("th", {}, "Cible") : null, ...colonnes.map((c) => el("th", {}, c.nom))])),
+    el("tbody", {}, reps.map((r) => {
+      const cible = r && r.recup ? "" : cibles[k++] || "";
+      return el("tr", { class: r && r.recup ? "ligne-recup" : "" }, [
+        el("td", {}, etiquette(r)), avecCible ? el("td", { class: "col-cible" }, cible || "–") : null, ...colonnes.map((c) => valeur(r, c.cle, c.texte)),
+      ]);
+    })),
   ]));
 }
 // Pastilles : difficulté, forme, distance, durée, allure, BPM ; puis le tableau des répétitions
@@ -2237,7 +2402,7 @@ function etatEffort(s, debut = []) {
     texteBpm(s.bpm_moy, s.bpm_max) ? el("span", { class: "chip coeur" }, texteBpm(s.bpm_moy, s.bpm_max)) : null,
     s.vo2max ? el("span", { class: "chip" }, "VO2 max " + Number(s.vo2max).toLocaleString("fr-FR")) : null,
   ].filter(Boolean);
-  const reps = tableauReps(s.reps_bpm, s.type);
+  const reps = tableauReps(s.reps_bpm, s.type, s.parametres);
   if (!pastilles.length && !reps && !chiffres) return null;
   return el("div", { class: "effort" }, [chiffres, pastilles.length ? el("div", { class: "etat" }, pastilles) : null, reps]);
 }
@@ -2410,10 +2575,11 @@ function champsReps(prefixe, nb, existants = [], prevu = {}) {
   const dureePrevue = (i) => (prevuLigne(i) ? prevuLigne(i).duree : prevu.duree);
   // Allure calculée toute seule quand la distance de la répétition est connue
   function allureAuto(l, i) {
-    if (!prevu.distance || l.recup.checked) { l.allure.placeholder = "–"; return; }
+    const dist = (prevuLigne(i) && prevuLigne(i).distance) || prevu.distance;
+    if (!dist || l.recup.checked) { l.allure.placeholder = "–"; return; }
     let sec = null;
     try { sec = lireChrono(l.duree.value, dureePrevue(i), ""); } catch (e) { sec = null; }
-    l.allure.placeholder = sec ? formatAllure(sec / (prevu.distance / 1000)) : "–";
+    l.allure.placeholder = sec ? formatAllure(sec / (dist / 1000)) : "–";
   }
   function maj(n, nouveauPrevu) {
     garder();
@@ -2434,7 +2600,7 @@ function champsReps(prefixe, nb, existants = [], prevu = {}) {
     nbModele = n;
     const total = n === 0 ? 0 : Math.max(1, n + ajout);
     lignes = [];
-    const marche = !!prevu.lignes; // footing avec marche
+    const marche = !!prevu.marche; // footing avec marche
     grille.classList.toggle("reps-marche", marche);
     grille.replaceChildren(...(marche ? ["", "Temps", "Allure", "BPM moy", "BPM max", "Marche"] : ["", "Récup", "Temps", "Allure", "BPM moy", "BPM max"]).map((t) => el("span", { class: "label" }, t)));
     for (let i = 0; i < total; i++) {
@@ -2452,8 +2618,9 @@ function champsReps(prefixe, nb, existants = [], prevu = {}) {
       };
       const dp = dureePrevue(i);
       if (dp && !prevu.distance) l.duree.placeholder = formatChrono(dp);
+      const cible = prevuLigne(i) && prevuLigne(i).cible;
       const cocheRecup = el("label", { class: "case-recup", for: recup.id }, recup);
-      const numero = el("span", { class: "rep-nom" }, String(i + 1));
+      const numero = el("span", { class: "rep-nom" }, [String(i + 1), cible ? el("small", { class: "rep-cible" }, cible) : null]);
       const majLigne = () => { [numero, cocheRecup, l.duree, l.allure, l.moy, l.max].forEach((c) => c.classList.toggle("est-recup", recup.checked)); allureAuto(l, i); };
       recup.addEventListener("change", majLigne);
       l.duree.addEventListener("input", () => allureAuto(l, i));
@@ -2462,7 +2629,9 @@ function champsReps(prefixe, nb, existants = [], prevu = {}) {
       lignes.push(l);
       majLigne();
     }
-    aide.textContent = prevu.distance
+    aide.textContent = prevu.distance || (prevu.lignes && !prevu.marche && prevu.lignes.some((x) => x.distance))
+      ? "Temps comme « 1:18 » ; pour une distance, l'allure se calcule toute seule. Coche « Récup » pour une ligne de récupération."
+      : prevu.distance
       ? "Durée comme « 1:18 » ; l'allure se calcule toute seule avec les " + prevu.distance + " m. Coche « Récup » pour une ligne de récupération."
       : prevu.lignes
         ? "Temps comme « 8:00 » (ou « 8 » pour 8 min) ; allure en min/km, comme « 5:40 ». La case « Marche » est cochée pour les blocs de marche : ils ne comptent pas dans l'allure."
@@ -2480,7 +2649,8 @@ function champsReps(prefixe, nb, existants = [], prevu = {}) {
         if (l.recup.checked) r.recup = true;
         const duree = lireChrono(l.duree.value, dureePrevue(i), nom);
         let allure = lireAllure(l.allure.value, nom);
-        if (!allure && duree && prevu.distance && !r.recup) { allure = Math.round(duree / (prevu.distance / 1000)); r.allureCalculee = true; }
+        const dist = (prevuLigne(i) && prevuLigne(i).distance) || prevu.distance;
+        if (!allure && duree && dist && !r.recup) { allure = Math.round(duree / (dist / 1000)); r.allureCalculee = true; }
         const moy = lireBpm(l.moy, nom + ", BPM moyen"), max = lireBpm(l.max, nom + ", BPM max");
         if (duree) r.duree = duree;
         if (allure) r.allure = allure;
@@ -2797,6 +2967,14 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "4.0", nom: "Série après série", date: "16 novembre 2026", nouveautes: [
+    "Fractionné, seuil et nouvelle « Séance mixte » se construisent série par série : chaque série a son nombre de répétitions, son temps ou sa distance, son allure cible et sa récup (en temps ou en distance).",
+    "Allures cibles : SV1 et SV2 pour le seuil ; SV1, SV2, AS10K, AS21K, AS42K ou une allure libre pour la séance mixte (et VMA, AS5K… pour le fractionné).",
+    "Une série se duplique en un appui. Dans le tableau, chaque répétition rappelle son allure cible.",
+  ] },
+  { num: "3.9", nom: "Trié sur le volet", date: "9 novembre 2026", nouveautes: [
+    "Le fil se trie aussi par type de séance (footing, seuil, côtes…), en plus des personnes.",
+  ] },
   { num: "3.8", nom: "Tout rond", date: "3 novembre 2026", nouveautes: [
     "Coins arrondis et animations plus dynamiques.",
     "Footing avec marche : un tableau toujours pareil (temps, allure, BPM moyen, BPM max, et une case « Marche »).",
@@ -3450,21 +3628,36 @@ function libelleJour(iso) {
 }
 let dernierJourFil = null;
 
-/* ---------- Trier le fil : ne voir que certaines personnes ---------- */
-let filtreFil = [];
+/* ---------- Trier le fil : certaines personnes, certains types de séance ---------- */
+let filtreFil = [], filtreTypes = [];
 function cleFiltreFil() { return "couloir-filtre-fil-" + (moi ? moi.id : ""); }
 function preparerFiltreFil() {
-  let garde = [];
+  let garde = [], gardeTypes = [];
   try { garde = JSON.parse(lire(cleFiltreFil()) || "[]"); } catch (e) { garde = []; }
+  try { gardeTypes = JSON.parse(lire(cleFiltreFil() + "-types") || "[]"); } catch (e) { gardeTypes = []; }
   filtreFil = Array.isArray(garde) ? garde.filter((id) => profilsConnus.some((p) => p.id === id)) : [];
+  filtreTypes = Array.isArray(gardeTypes) ? gardeTypes.filter((t) => MODELES[t]) : [];
   $("filtre-fil-choix").hidden = true;
   $("filtre-fil-bouton").setAttribute("aria-expanded", "false");
   majTexteFiltre();
 }
 function majTexteFiltre() {
   const noms = filtreFil.map((id) => (moi && id === moi.id ? "Moi" : (profilsConnus.find((p) => p.id === id) || {}).prenom)).filter(Boolean);
-  $("filtre-fil-texte").textContent = !noms.length ? "Tout le monde" : noms.length <= 2 ? noms.join(" et ") : noms.length + " personnes";
-  $("filtre-fil-bouton").classList.toggle("actif", noms.length > 0);
+  const types = filtreTypes.map((t) => MODELES[t].nom);
+  $("filtre-fil-texte").textContent = (!noms.length ? "Tout le monde" : noms.length <= 2 ? noms.join(" et ") : noms.length + " personnes")
+    + (types.length ? " · " + (types.length <= 2 ? types.join(", ") : types.length + " types") : "");
+  $("filtre-fil-bouton").classList.toggle("actif", noms.length > 0 || types.length > 0);
+}
+function relancerFil() {
+  majTexteFiltre();
+  clearTimeout(attenteFiltre);
+  attenteFiltre = setTimeout(() => chargerFil(true, false), 250);
+}
+function appliquerFiltreTypes(types) {
+  filtreTypes = types;
+  ecrire(cleFiltreFil() + "-types", JSON.stringify(types));
+  document.querySelectorAll("#filtre-fil-types button").forEach((b) => b.setAttribute("aria-pressed", String(types.includes(b.dataset.type))));
+  relancerFil();
 }
 let attenteFiltre = null;
 function appliquerFiltre(ids) {
@@ -3483,7 +3676,13 @@ $("filtre-fil-bouton").addEventListener("click", () => {
   const choix = choixPersonnes("filtre-fil", personnes, { coches: filtreFil });
   choix.bloc.addEventListener("change", () => appliquerFiltre(choix.valeurs()));
   $("filtre-fil-personnes").replaceChildren(choix.bloc);
+  $("filtre-fil-types").replaceChildren(...Object.entries(MODELES).map(([t, m]) => {
+    const b = el("button", { type: "button", "data-type": t, "aria-pressed": String(filtreTypes.includes(t)) }, m.nom);
+    b.addEventListener("click", () => appliquerFiltreTypes(filtreTypes.includes(t) ? filtreTypes.filter((x) => x !== t) : [...filtreTypes, t]));
+    return b;
+  }));
 });
+$("filtre-fil-tous-types").addEventListener("click", () => appliquerFiltreTypes([]));
 $("filtre-fil-tous").addEventListener("click", () => {
   $("filtre-fil-personnes").querySelectorAll("input").forEach((i) => { i.checked = false; });
   appliquerFiltre([]);
@@ -3501,11 +3700,11 @@ async function chargerFil(depuisLeDebut, avecPropositions = true) {
   }
   try {
     const de = pageFil * PAR_PAGE;
-    const posts = await donnees.fil(de, de + PAR_PAGE - 1, filtreFil);
+    const posts = await donnees.fil(de, de + PAR_PAGE - 1, filtreFil, filtreTypes);
     if (depuisLeDebut) liste.replaceChildren();
     if (depuisLeDebut && posts.length === 0) {
-      liste.append(el("p", { class: "vide" }, filtreFil.length
-        ? "Aucune séance de " + (filtreFil.length > 1 ? "ces personnes" : "cette personne") + " pour l'instant."
+      liste.append(el("p", { class: "vide" }, filtreFil.length || filtreTypes.length
+        ? "Aucune séance ne correspond à ce tri pour l'instant."
         : "Rien pour l'instant. Dès qu'une séance sera cochée comme faite ou publiée, elle apparaîtra ici."));
     }
     posts.forEach((s) => {
@@ -5183,6 +5382,7 @@ function toast(texte) {
   document.body.append(t);
   setTimeout(() => { t.classList.add("part"); setTimeout(() => t.remove(), 300); }, 1900);
 }
+
 
 </script>
 </body>
