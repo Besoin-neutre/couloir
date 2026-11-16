@@ -919,8 +919,9 @@ html[data-coins="ronds"] .photo-seance { border-radius: 10px; }
 .pdf-sous { color: #555; margin-top: 3px; }
 .pdf-logo { font-weight: 800; font-style: italic; letter-spacing: -0.06em; font-size: 16pt; } .pdf-logo span { color: var(--acc); }
 .pdf-mini { font-size: 6.5pt; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: #666; }
-.pdf-corps { display: grid; grid-template-columns: minmax(0, 1fr) 52mm; gap: 6mm; }
-.pdf-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2mm; }
+.pdf-corps { display: block; }
+.pdf-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)) 50mm; gap: 2mm; }
+.pdf-cal > .pdf-h:last-of-type { padding-left: 2mm; }
 .pdf-h { font-size: 7pt; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #555; }
 .pdf-case { border-radius: 6px; background: #f4f3ef; min-height: 24mm; padding: 2mm; display: grid; align-content: start; gap: 1.5mm; break-inside: avoid; }
 .pdf-case.hors { opacity: .45; }
@@ -936,7 +937,7 @@ html[data-coins="ronds"] .photo-seance { border-radius: 10px; }
 .pdf-leg { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 6px; font-size: 7.5pt; }
 .pdf-leg i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
 .pdf-cote { display: grid; gap: 3mm; align-content: start; }
-.pdf-bloc { border-radius: 6px; border: 1px solid #ddd; padding: 3mm; break-inside: avoid; }
+.pdf-bloc { border-radius: 6px; border: 1px solid #ddd; padding: 2.5mm 3mm; break-inside: avoid; margin-left: 2mm; display: grid; align-content: center; }
 .pdf-bloc b { font-size: 9pt; font-style: italic; font-weight: 800; }
 .pdf-ln { display: flex; justify-content: space-between; align-items: baseline; font-size: 8pt; margin-top: 1.5mm; }
 .pdf-ln strong { font-size: 11pt; font-weight: 800; font-style: italic; letter-spacing: -0.03em; }
@@ -950,7 +951,6 @@ html[data-coins="ronds"] .photo-seance { border-radius: 10px; }
   .pdf-vue { position: absolute; top: 0; left: 0; right: 0; bottom: auto; padding: 0; background: #fff; overflow: visible; animation: none; }
   .pdf-barre-outils { display: none !important; }
   .pdf-page { box-shadow: none; width: auto; padding: 0; zoom: 1 !important; }
-  .pdf-corps { grid-template-columns: minmax(0, 1fr) 52mm !important; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 </style>
@@ -5514,13 +5514,7 @@ async function genererPdf() {
       s.toute_semaine && !s.fait ? el("div", { class: "pdf-m gris" }, "Dans la semaine") : null,
     ]);
   };
-  const cal = el("div", { class: "pdf-cal" }, ["Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam.", "Dim."].map((j) => el("div", { class: "pdf-h" }, j)));
-  semaines.forEach((sem) => sem.forEach((iso) => {
-    cal.append(el("div", { class: "pdf-case" + (dansPeriode(iso) ? "" : " hors") }, [
-      el("div", { class: "pdf-d" }, court(iso)),
-      ...seances.filter((s) => s.date === iso).map(carte),
-    ]));
-  }));
+  const cal = el("div", { class: "pdf-cal" }, [...["Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam.", "Dim."].map((j) => el("div", { class: "pdf-h" }, j)), el("div", { class: "pdf-h" }, "Bilan de la semaine")]);
   const typesVus = [...new Set(seances.map((s) => s.type).filter((t) => MODELES[t]))];
   const legende = el("div", { class: "pdf-leg" }, typesVus.map((t) => el("span", {}, [el("i", { style: "background:" + (COULEURS_TYPES[t] || "#555") }), MODELES[t].nom])));
 
@@ -5531,12 +5525,19 @@ async function genererPdf() {
   });
   const maxKm = Math.max(1, ...totaux.map((t) => t.km)), maxSec = Math.max(1, ...totaux.map((t) => t.sec));
   const barre = (v, max) => { const i = el("i"); i.style.width = Math.round((v / max) * 100) + "%"; return el("div", { class: "pdf-barre" }, i); };
-  const cote = el("div", { class: "pdf-cote" }, [el("div", { class: "pdf-mini" }, "Par semaine"), ...totaux.map((t) => el("div", { class: "pdf-bloc" }, [
-    el("b", {}, "Du " + dateLocale(t.sem[0]).getDate() + " au " + jm(t.sem[6])),
-    el("div", { class: "pdf-ln" }, [el("span", {}, "Temps"), el("strong", {}, t.sec ? enDuree(t.sec) : "0 min")]), barre(t.sec, maxSec),
-    el("div", { class: "pdf-ln" }, [el("span", {}, "Distance"), el("strong", {}, (Math.round(t.km * 10) / 10).toLocaleString("fr-FR") + " km")]), barre(t.km, maxKm),
-    el("div", { class: "pdf-ln" }, [el("span", {}, "Séances faites"), el("strong", {}, t.nf + "/" + t.np)]),
-  ]))]);
+  // Chaque semaine : ses 7 jours, puis son bilan sur la même ligne
+  totaux.forEach((t) => {
+    t.sem.forEach((iso) => cal.append(el("div", { class: "pdf-case" + (dansPeriode(iso) ? "" : " hors") }, [
+      el("div", { class: "pdf-d" }, court(iso)),
+      ...seances.filter((s) => s.date === iso).map(carte),
+    ])));
+    cal.append(el("div", { class: "pdf-bloc" }, [
+      el("b", {}, "Du " + dateLocale(t.sem[0]).getDate() + " au " + jm(t.sem[6])),
+      el("div", { class: "pdf-ln" }, [el("span", {}, "Temps"), el("strong", {}, t.sec ? enDuree(t.sec) : "0 min")]), barre(t.sec, maxSec),
+      el("div", { class: "pdf-ln" }, [el("span", {}, "Distance"), el("strong", {}, (Math.round(t.km * 10) / 10).toLocaleString("fr-FR") + " km")]), barre(t.km, maxKm),
+      el("div", { class: "pdf-ln" }, [el("span", {}, "Séances faites"), el("strong", {}, t.nf + "/" + t.np)]),
+    ]));
+  });
 
   const rapport = el("div", { class: "pdf-page", style: "--acc:" + couleurDe(personne) }, [
     el("header", { class: "pdf-tete" }, [
@@ -5545,7 +5546,7 @@ async function genererPdf() {
       el("div", { class: "pdf-droite" }, [el("div", { class: "pdf-logo" }, ["athlé", el("span", {}, ".")]),
         el("div", { class: "pdf-genere" }, "Généré par " + nomComplet(moi) + " le " + jm(aujourdhui()))]),
     ]),
-    el("div", { class: "pdf-corps" }, [el("div", {}, [cal, legende]), cote]),
+    el("div", { class: "pdf-corps" }, [cal, legende]),
   ]);
   const imprimer = el("button", { type: "button" }, "Enregistrer en PDF / Imprimer");
   const fermer = el("button", { type: "button", class: "ghost" }, "Fermer");
