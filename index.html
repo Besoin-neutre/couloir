@@ -784,9 +784,10 @@ button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
 .lot-ligne .bloc-outils { margin-left: auto; }
 .lot-fois { font-weight: 700; }
 .lot-etiquette { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-.lot-ligne2 .lot-etiquette:nth-of-type(2) { margin-left: 6px; }
+.lot-ligne2 .lot-etiquette { min-width: 50px; }
 .lot-autre { width: 100%; }
 .lot-R { padding: 0 2px; }
+.lot-R .lot-etiquette { flex-basis: 100%; }
 .rep-nom { display: grid; justify-items: center; line-height: 1.1; }
 .rep-cible { font-size: 9px; font-weight: 700; letter-spacing: .04em; color: var(--track); }
 .reps-table .col-cible { font-size: 12px; font-weight: 700; color: var(--auteur, var(--track)); }
@@ -1170,21 +1171,6 @@ html[data-coins="ronds"] .photo-seance { border-radius: 10px; }
       </div>
       <button type="button" class="lien petit" id="filtre-tous-jours" style="justify-self:start" hidden>Voir tous les jours</button>
       <div class="seances" id="coach-seances"></div>
-
-      <section class="card" id="export-pdf">
-        <h3>Exporter en PDF</h3>
-        <p class="aide">Le calendrier d'un athlète sur la période choisie : chaque séance (prévue, faite ou modifiée), son ressenti, et le temps et les km de chaque semaine.</p>
-        <div class="field">
-          <label for="pdf-athlete">Athlète</label>
-          <select id="pdf-athlete"></select>
-        </div>
-        <div class="dates-pdf">
-          <div class="field"><label for="pdf-debut">Du</label><input id="pdf-debut" type="date"></div>
-          <div class="field"><label for="pdf-fin">Au</label><input id="pdf-fin" type="date"></div>
-        </div>
-        <div class="actions"><button type="button" id="bouton-pdf">Générer le PDF</button></div>
-        <p class="error" id="erreur-pdf" hidden></p>
-      </section>
     </div>
 
     <!-- ONGLET TROPHÉES -->
@@ -1217,6 +1203,21 @@ html[data-coins="ronds"] .photo-seance { border-radius: 10px; }
           <button type="button" class="ghost" id="profil-modifier">Modifier mon profil</button>
           <button type="button" class="lien petit lien-nouveautes">Quoi de neuf ? (version <span class="numero-version"></span>)</button>
         </div>
+      </section>
+
+      <section class="card" id="export-pdf" hidden>
+        <h3>Exporter en PDF</h3>
+        <p class="aide">Le calendrier d'un athlète sur la période choisie : chaque séance (prévue, faite ou modifiée), son ressenti, et le temps et les km de chaque semaine.</p>
+        <div class="field">
+          <label for="pdf-athlete">Athlète</label>
+          <select id="pdf-athlete"></select>
+        </div>
+        <div class="dates-pdf">
+          <div class="field"><label for="pdf-debut">Du</label><input id="pdf-debut" type="date"></div>
+          <div class="field"><label for="pdf-fin">Au</label><input id="pdf-fin" type="date"></div>
+        </div>
+        <div class="actions"><button type="button" id="bouton-pdf">Générer le PDF</button></div>
+        <p class="error" id="erreur-pdf" hidden></p>
       </section>
 
       <section class="card" id="profil-calendrier">
@@ -1845,7 +1846,7 @@ const MODELES = {
     nom: "Fractionné",
     echauffement: ECHAUFFEMENT,
     lots: { allures: ["", "VMA", "AS5K", "AS10K", "AS21K", "AS42K", "SV1", "SV2", "autre"],
-      defaut: [{ n: 5, e: 400, u: "m", a: "", r: 60, ru: "min" }, { n: 5, e: 400, u: "m", a: "", r: 60, ru: "min" }] },
+      defaut: [{ n: 5, e: 400, u: "m", a: "", r: 60, ru: "min", rm: "course" }, { n: 5, e: 400, u: "m", a: "", r: 60, ru: "min", rm: "course" }] },
     champs: [],
     nbReps: (v) => lotsDe(v, "fractionne").reduce((t, l) => t + l.n, 0),
     titre: (v) => titreLots("Fractionné", lotsDe(v, "fractionne")),
@@ -1854,7 +1855,7 @@ const MODELES = {
   seuil: {
     nom: "Seuil",
     echauffement: ECHAUFFEMENT,
-    lots: { allures: ["SV1", "SV2"], defaut: [{ n: 3, e: 480, u: "min", a: "SV1", r: 120, ru: "min" }] },
+    lots: { allures: ["SV1", "SV2"], defaut: [{ n: 3, e: 480, u: "min", a: "SV1", r: 120, ru: "min", rm: "course" }] },
     champs: [],
     nbReps: (v) => lotsDe(v, "seuil").reduce((t, l) => t + l.n, 0),
     titre: (v) => titreLots("Seuil", lotsDe(v, "seuil")),
@@ -1864,7 +1865,7 @@ const MODELES = {
     nom: "Séance mixte",
     echauffement: ECHAUFFEMENT,
     lots: { allures: ["SV1", "SV2", "AS10K", "AS21K", "AS42K", "autre"],
-      defaut: [{ n: 2, e: 600, u: "min", a: "AS21K", r: 90, ru: "min" }, { n: 4, e: 1000, u: "m", a: "AS10K", r: 60, ru: "min" }] },
+      defaut: [{ n: 2, e: 600, u: "min", a: "AS21K", r: 90, ru: "min", rm: "course" }, { n: 4, e: 1000, u: "m", a: "AS10K", r: 60, ru: "min", rm: "course" }] },
     champs: [],
     nbReps: (v) => lotsDe(v, "mixte").reduce((t, l) => t + l.n, 0),
     titre: (v) => titreLots("Séance mixte", lotsDe(v, "mixte")),
@@ -1910,7 +1911,7 @@ function blocSeries(v, effort) {
 // ---- Séances par séries (fractionné, seuil, séance mixte) ----
 // Une série : { n: répétitions, e: effort (secondes si u = "min", mètres si u = "m" ou "km"), u, a: allure cible, at: allure libre,
 //               r: récup entre répétitions (secondes si ru = "min", mètres si ru = "m"), ru }
-const NOMS_ALLURES = { "": "—", VMA: "VMA", AS5K: "AS5K", AS10K: "AS10K", AS21K: "AS21K", AS42K: "AS42K", SV1: "SV1", SV2: "SV2", autre: "Autre…" };
+const NOMS_ALLURES = { "": "—", VMA: "VMA", AS5K: "AS5k", AS10K: "AS10k", AS21K: "AS21k", AS42K: "AS42k", SV1: "SV1", SV2: "SV2", autre: "Autre…" };
 function lotsDe(v, type) {
   if (v && Array.isArray(v.lots) && v.lots.length) return v.lots;
   // Anciennes séances : « 2 × (5 × 400 m) » ou « 3 × 8 min »
@@ -1924,13 +1925,14 @@ function recupSeriesDe(v) {
   if (v && v.R) return v.R;
   return v && v.recupSerie ? { e: v.recupSerie, u: "min" } : { e: 180, u: "min" };
 }
+function texteRecup(e, u, mode) { return texteMesure(e, u) + (mode === "marche" ? " en marchant" : " en trottinant"); }
 function texteMesure(e, u) {
   if (!e) return "";
   if (u === "min") return enDuree(e);
   if (u === "km") return (Math.round(e / 10) / 100).toLocaleString("fr-FR") + " km";
   return e + " m";
 }
-function cibleDe(l) { return l.a === "autre" ? (l.at || "").trim() : l.a || ""; }
+function cibleDe(l) { return l.a === "autre" ? (l.at || "").trim() : l.a ? NOMS_ALLURES[l.a] || l.a : ""; }
 // Les séries identiques qui se suivent sont regroupées : « 2 × (5 × 400 m) »
 function groupesLots(lots) {
   const res = [];
@@ -1949,10 +1951,10 @@ function titreLots(nom, lots) {
 function corpsLots(lots, R, cibleParDefaut) {
   const lignes = groupesLots(lots).map(({ k, l }) => {
     const cible = cibleDe(l) || cibleParDefaut;
-    const t = l.n + " × " + texteMesure(l.e, l.u) + (cible ? " à " + cible : "") + (l.r ? ", r = " + texteMesure(l.r, l.ru) : "");
+    const t = l.n + " × " + texteMesure(l.e, l.u) + (cible ? " à " + cible : "") + (l.r ? ", r = " + texteRecup(l.r, l.ru, l.rm) : "");
     return k > 1 ? k + " × (" + t + ")" : t;
   });
-  if (lots.length > 1 && R && R.e) lignes.push("R = " + texteMesure(R.e, R.u) + " entre les séries");
+  if (lots.length > 1 && R && R.e) lignes.push("R = " + texteRecup(R.e, R.u, R.m) + " entre les séries");
   return lignes.join("\n");
 }
 // Nombre de répétitions d'une séance enregistrée (0 pour un footing, un renfo…)
@@ -2183,6 +2185,10 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
       allure.addEventListener("change", () => { lots[i].a = allure.value; autre.hidden = allure.value !== "autre"; if (!autre.hidden) autre.focus(); maj(); });
       autre.addEventListener("input", () => { lots[i].at = autre.value; maj(); });
       const [recup, uniteRecup] = champMesure(i, "r", "ru", [["min", "min"], ["m", "m"]], nom + " : récup entre les répétitions");
+      const modeRecup = el("select", { id: prefixe + "-lot-rm-" + i, "aria-label": nom + " : récup en courant ou en marchant" }, [el("option", { value: "course" }, "Course"), el("option", { value: "marche" }, "Marche")]);
+      modeRecup.value = l.rm === "marche" ? "marche" : "course";
+      lots[i].rm = modeRecup.value;
+      modeRecup.addEventListener("change", () => { lots[i].rm = modeRecup.value; maj(); });
       const icone = (svg, label, action) => { const b = el("button", { type: "button", class: "ghost bouton-icone", "aria-label": label, title: label }); b.innerHTML = svg; b.addEventListener("click", action); return b; };
       const outils = el("div", { class: "bloc-outils" }, [
         icone(ICONE_COPIER, "Dupliquer la " + nom.toLowerCase(), () => { lots.splice(i + 1, 0, { ...lots[i] }); construireLots(); maj(); }),
@@ -2190,10 +2196,8 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
       ]);
       return el("div", { class: "lot" }, [
         el("div", { class: "lot-ligne" }, [el("span", { class: "bloc-num" }, String(i + 1)), nb, el("span", { class: "lot-fois" }, "×"), effort, uniteEffort, outils]),
-        el("div", { class: "lot-ligne lot-ligne2" }, [
-          el("label", { class: "lot-etiquette", for: allure.id }, "Allure"), allure,
-          el("label", { class: "lot-etiquette", for: recup.id }, "Récup"), recup, uniteRecup,
-        ]),
+        el("div", { class: "lot-ligne lot-ligne2" }, [el("label", { class: "lot-etiquette", for: allure.id }, "Allure"), allure]),
+        el("div", { class: "lot-ligne lot-ligne2" }, [el("label", { class: "lot-etiquette", for: recup.id }, "Récup"), recup, uniteRecup, modeRecup]),
         autre,
       ]);
     });
@@ -2203,14 +2207,15 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     recupSeriesParType[type] = R;
     const rIn = el("input", { type: "text", inputmode: "decimal", id: prefixe + "-lot-R", autocomplete: "off", placeholder: "0" });
     const rU = el("select", { id: prefixe + "-lot-RU", "aria-label": "Récup entre les séries : unité" }, [el("option", { value: "min" }, "min"), el("option", { value: "m" }, "m")]);
-    rIn.value = ecrireMesure(R.e, R.u); rU.value = R.u;
-    const lireR = () => { const v = lireMesure(rIn.value, rU.value); R.e = Number.isNaN(v) ? 0 : v; R.u = rU.value; maj(); };
-    rIn.addEventListener("input", lireR); rU.addEventListener("change", lireR);
+    const rM = el("select", { id: prefixe + "-lot-RM", "aria-label": "Récup entre les séries : en courant ou en marchant" }, [el("option", { value: "course" }, "Course"), el("option", { value: "marche" }, "Marche")]);
+    rIn.value = ecrireMesure(R.e, R.u); rU.value = R.u; rM.value = R.m === "marche" ? "marche" : "course"; R.m = rM.value;
+    const lireR = () => { const v = lireMesure(rIn.value, rU.value); R.e = Number.isNaN(v) ? 0 : v; R.u = rU.value; R.m = rM.value; maj(); };
+    rIn.addEventListener("input", lireR); rU.addEventListener("change", lireR); rM.addEventListener("change", lireR);
     zoneLots.replaceChildren(
       el("span", { class: "label" }, "Les séries"),
       ...lignes,
       el("div", { class: "actions" }, [ajouter]),
-      lots.length > 1 ? el("div", { class: "lot-ligne lot-R" }, [el("label", { class: "lot-etiquette", for: rIn.id }, "Récup entre les séries"), rIn, rU]) : null,
+      lots.length > 1 ? el("div", { class: "lot-ligne lot-R" }, [el("label", { class: "lot-etiquette", for: rIn.id }, "Récup entre les séries"), rIn, rU, rM]) : null,
       el("p", { class: "aide" }, "Temps : « 8 » = 8 min, « 1:30 », « 45s ». Distance en mètres (« 400 ») ou en km (« 1,5 »). La récup peut être un temps ou une distance (trot)."),
     );
   }
@@ -3021,7 +3026,7 @@ function aller(o, personne = null) {
   majPastilles();
   if (o === "fil") chargerFil(true);
   if (o === "semaine") afficherVue();
-  if (o === "planifier") { afficherPlanifier(); preparerExportPdf(); }
+  if (o === "planifier") afficherPlanifier();
   if (o === "trophees") afficherTrophees();
   if (o === "profil") afficherProfil();
 }
@@ -3034,11 +3039,12 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    ========================================================= */
 const VERSIONS = [
   { num: "4.1", nom: "Sur papier", date: "16 novembre 2026", nouveautes: [
-    "Le coach peut exporter en PDF le calendrier d'un athlète sur une période : chaque séance avec son ressenti, et le temps et les km de chaque semaine.",
+    "Le coach peut exporter en PDF le calendrier d'un athlète sur une période, depuis son profil : chaque séance avec son ressenti, et le temps et les km de chaque semaine.",
+    "Pour chaque récup, on précise si elle se fait en courant ou en marchant.",
   ] },
   { num: "4.0", nom: "Série après série", date: "16 novembre 2026", nouveautes: [
     "Fractionné, seuil et nouvelle « Séance mixte » se construisent série par série : chaque série a son nombre de répétitions, son temps ou sa distance, son allure cible et sa récup (en temps ou en distance).",
-    "Allures cibles : SV1 et SV2 pour le seuil ; SV1, SV2, AS10K, AS21K, AS42K ou une allure libre pour la séance mixte (et VMA, AS5K… pour le fractionné).",
+    "Allures cibles : SV1 et SV2 pour le seuil ; SV1, SV2, AS10k, AS21k, AS42k ou une allure libre pour la séance mixte (et VMA, AS5k… pour le fractionné).",
     "Une série se duplique en un appui. Dans le tableau, chaque répétition rappelle son allure cible.",
   ] },
   { num: "3.9", nom: "Trié sur le volet", date: "9 novembre 2026", nouveautes: [
@@ -5114,6 +5120,7 @@ async function afficherProfil() {
   $("profil-courbe").hidden = false;
   $("profil-calendrier").hidden = false;
   $("profil-notifs").hidden = true;
+  $("export-pdf").hidden = true;
   $("profil-espace").hidden = true;
   $("profil-cal").replaceChildren(el("p", { class: "muted" }, "Chargement…"));
   $("mes-trophees").replaceChildren();
@@ -5151,6 +5158,7 @@ async function afficherProfil() {
     const barres = barresObjectifs(p, st.w);
     if (barres) $("objectifs-contenu").replaceChildren(...barres);
     if (estMoi) { $("profil-notifs").hidden = false; afficherNotifs(); if (moi.id === ID_TOMI) afficherEspace(); }
+    if (estMoi && moi.role === "Coach") { $("export-pdf").hidden = false; preparerExportPdf(); }
   } catch (e) {
     $("stats-tuiles").replaceChildren(el("p", { class: "error" }, messageErreur(e)));
   }
@@ -5379,7 +5387,7 @@ $("profil-modifier").addEventListener("click", () => {
   $("pf-records").replaceChildren(...(Array.isArray(moi.records) ? moi.records : []).map((r) => ligneRecord(r)));
   majCompteur();
   afficherMessage("erreur-pf", "");
-  ["profil-vue", "profil-stats", "profil-courbe", "profil-objectifs", "profil-records", "profil-calendrier", "profil-notifs", "profil-espace"].forEach((id) => ($(id).hidden = true));
+  ["profil-vue", "profil-stats", "profil-courbe", "profil-objectifs", "profil-records", "profil-calendrier", "profil-notifs", "profil-espace", "export-pdf"].forEach((id) => ($(id).hidden = true));
   $("profil-form").hidden = false;
   window.scrollTo(0, 0);
 });
