@@ -906,6 +906,52 @@ html[data-coins="ronds"] .photo-seance { border-radius: 10px; }
 
 
 
+
+/* ---------- PDF du coach ---------- */
+.dates-pdf { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pdf-vue { position: fixed; inset: 0; z-index: 80; background: #e9e7e2; overflow: auto; padding: 12px; color: #111; animation: fondu .2s both; }
+.pdf-barre-outils { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 297mm; margin: 0 auto 12px; }
+.pdf-barre-outils .aide { flex-basis: 100%; margin: 0; color: #555; }
+.pdf-page { background: #fff; color: #111; width: 277mm; margin: 0 auto; padding: 8mm 10mm; box-sizing: content-box; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 9pt; box-shadow: 0 6px 30px rgba(0,0,0,.12); }
+.pdf-tete { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 10px; }
+.pdf-tete h1 { margin: 0; font-size: 22pt; font-weight: 800; font-style: italic; letter-spacing: -0.05em; line-height: 1; color: #111; }
+.pdf-sous { color: #555; margin-top: 3px; }
+.pdf-logo { font-weight: 800; font-style: italic; letter-spacing: -0.06em; font-size: 16pt; } .pdf-logo span { color: var(--acc); }
+.pdf-mini { font-size: 6.5pt; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: #666; }
+.pdf-corps { display: grid; grid-template-columns: minmax(0, 1fr) 52mm; gap: 6mm; }
+.pdf-cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2mm; }
+.pdf-h { font-size: 7pt; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #555; }
+.pdf-case { border-radius: 6px; background: #f4f3ef; min-height: 24mm; padding: 2mm; display: grid; align-content: start; gap: 1.5mm; break-inside: avoid; }
+.pdf-case.hors { opacity: .45; }
+.pdf-d { font-size: 7pt; color: #888; font-weight: 700; }
+.pdf-s { background: #fff; border-radius: 4px; padding: 1.5mm 2mm; border-top: 3px solid var(--c); }
+.pdf-s.prevue { background: transparent; border: 1px dashed #aaa; border-top: 3px dashed var(--c); }
+.pdf-s.manquee { opacity: .5; }
+.pdf-t { font-size: 6pt; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--c); }
+.pdf-n { font-size: 7.5pt; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.pdf-x { font-size: 7pt; font-weight: 800; font-style: italic; margin-top: 1px; }
+.pdf-r { display: inline-block; white-space: nowrap; margin-top: 1.5px; font-size: 6.5pt; font-weight: 700; background: color-mix(in srgb, var(--acc) 14%, #fff); color: #222; padding: 0 5px; border-radius: 999px; }
+.pdf-m { font-size: 6pt; color: #b0700f; font-weight: 700; margin-top: 1px; } .pdf-m.gris { color: #777; }
+.pdf-leg { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 6px; font-size: 7.5pt; }
+.pdf-leg i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; }
+.pdf-cote { display: grid; gap: 3mm; align-content: start; }
+.pdf-bloc { border-radius: 6px; border: 1px solid #ddd; padding: 3mm; break-inside: avoid; }
+.pdf-bloc b { font-size: 9pt; font-style: italic; font-weight: 800; }
+.pdf-ln { display: flex; justify-content: space-between; align-items: baseline; font-size: 8pt; margin-top: 1.5mm; }
+.pdf-ln strong { font-size: 11pt; font-weight: 800; font-style: italic; letter-spacing: -0.03em; }
+.pdf-barre { height: 3mm; border-radius: 2mm; background: #eee; margin: 1mm 0; overflow: hidden; } .pdf-barre i { display: block; height: 100%; background: var(--acc); }
+.pdf-droite { text-align: right; } .pdf-genere { font-size: 7pt; color: #888; margin-top: 2px; }
+
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  body.avec-pdf > *:not(.pdf-vue) { display: none !important; }
+  body.avec-pdf { background: #fff !important; }
+  .pdf-vue { position: absolute; top: 0; left: 0; right: 0; bottom: auto; padding: 0; background: #fff; overflow: visible; animation: none; }
+  .pdf-barre-outils { display: none !important; }
+  .pdf-page { box-shadow: none; width: auto; padding: 0; zoom: 1 !important; }
+  .pdf-corps { grid-template-columns: minmax(0, 1fr) 52mm !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
 </style>
 <!-- Bibliothèque officielle de Supabase (le « traducteur » entre le site et la base de données) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
@@ -1124,6 +1170,21 @@ html[data-coins="ronds"] .photo-seance { border-radius: 10px; }
       </div>
       <button type="button" class="lien petit" id="filtre-tous-jours" style="justify-self:start" hidden>Voir tous les jours</button>
       <div class="seances" id="coach-seances"></div>
+
+      <section class="card" id="export-pdf">
+        <h3>Exporter en PDF</h3>
+        <p class="aide">Le calendrier d'un athlète sur la période choisie : chaque séance (prévue, faite ou modifiée), son ressenti, et le temps et les km de chaque semaine.</p>
+        <div class="field">
+          <label for="pdf-athlete">Athlète</label>
+          <select id="pdf-athlete"></select>
+        </div>
+        <div class="dates-pdf">
+          <div class="field"><label for="pdf-debut">Du</label><input id="pdf-debut" type="date"></div>
+          <div class="field"><label for="pdf-fin">Au</label><input id="pdf-fin" type="date"></div>
+        </div>
+        <div class="actions"><button type="button" id="bouton-pdf">Générer le PDF</button></div>
+        <p class="error" id="erreur-pdf" hidden></p>
+      </section>
     </div>
 
     <!-- ONGLET TROPHÉES -->
@@ -1347,6 +1408,11 @@ const donnees = {
   },
   async athletes() {
     return verifier(await sb.from("profils").select("id, prenom, nom, discipline, photo_url, couleur").eq("role", "Athlète").order("prenom"));
+  },
+  // Toutes les séances d'une personne entre deux dates (pour le PDF du coach)
+  async seancesPeriode(athleteId, debut, fin) {
+    return verifier(await sb.from("seances").select(CHAMPS_SEANCE).eq("athlete_id", athleteId)
+      .gte("date", debut).lte("date", fin).order("date").order("cree_le"));
   },
   // Les séances données par le coach, filtrées par personne et/ou par jour
   async seancesDonnees(coachId, { athleteId = null, jour = null } = {}) {
@@ -2955,7 +3021,7 @@ function aller(o, personne = null) {
   majPastilles();
   if (o === "fil") chargerFil(true);
   if (o === "semaine") afficherVue();
-  if (o === "planifier") afficherPlanifier();
+  if (o === "planifier") { afficherPlanifier(); preparerExportPdf(); }
   if (o === "trophees") afficherTrophees();
   if (o === "profil") afficherProfil();
 }
@@ -2967,6 +3033,9 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "4.1", nom: "Sur papier", date: "16 novembre 2026", nouveautes: [
+    "Le coach peut exporter en PDF le calendrier d'un athlète sur une période : chaque séance avec son ressenti, et le temps et les km de chaque semaine.",
+  ] },
   { num: "4.0", nom: "Série après série", date: "16 novembre 2026", nouveautes: [
     "Fractionné, seuil et nouvelle « Séance mixte » se construisent série par série : chaque série a son nombre de répétitions, son temps ou sa distance, son allure cible et sa récup (en temps ou en distance).",
     "Allures cibles : SV1 et SV2 pour le seuil ; SV1, SV2, AS10K, AS21K, AS42K ou une allure libre pour la séance mixte (et VMA, AS5K… pour le fractionné).",
@@ -5384,6 +5453,114 @@ function toast(texte) {
 }
 
 
+
+/* ---------- PDF du coach : le calendrier d'un athlète sur une période ---------- */
+const COULEURS_TYPES = {
+  footing: "#3b82c4", footing_fractionne: "#5aa7d6", sortie_longue: "#2f7d32", fractionne: "#c4481c", seuil: "#d97a1e",
+  mixte: "#9b4bd1", cotes: "#8a5a2b", vitesse: "#d1386b", renfo: "#6b6b6b", libre: "#444444",
+};
+function preparerExportPdf() {
+  const sel = $("pdf-athlete");
+  const personnes = profilsConnus.slice().sort((a, b) => (a.prenom || "").localeCompare(b.prenom || "", "fr"));
+  const avant = sel.value;
+  sel.replaceChildren(...personnes.map((p) => el("option", { value: p.id }, nomComplet(p))));
+  if (avant) sel.value = avant;
+  if (!$("pdf-debut").value) {
+    const lundi = isoLocal(lundiDe(new Date()));
+    $("pdf-debut").value = decalerIso(lundi, -14);
+    $("pdf-fin").value = decalerIso(lundi, 6);
+  }
+}
+function statutPdf(s) {
+  if (s.fait) return s.parametres && s.parametres.prevu ? "modifiee" : "faite";
+  return s.date && s.date < aujourdhui() ? "manquee" : "prevue";
+}
+async function genererPdf() {
+  const personne = profilsConnus.find((p) => p.id === $("pdf-athlete").value);
+  let debut = $("pdf-debut").value, fin = $("pdf-fin").value;
+  if (!personne || !debut || !fin) throw erreurLisible("Choisis un athlète et les deux dates.");
+  if (fin < debut) [debut, fin] = [fin, debut];
+  const lundi = isoLocal(lundiDe(dateLocale(debut)));
+  const dimanche = decalerIso(isoLocal(lundiDe(dateLocale(fin))), 6);
+  if (nbJoursEntre(lundi, dimanche) > 7 * 16) throw erreurLisible("Choisis une période de 16 semaines au plus.");
+  const seances = await donnees.seancesPeriode(personne.id, lundi, dimanche);
+
+  const jm = (iso) => dateLocale(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+  const court = (iso) => dateLocale(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+  const semaines = [];
+  for (let d = lundi; d <= dimanche; d = decalerIso(d, 7)) semaines.push(Array.from({ length: 7 }, (_, i) => decalerIso(d, i)));
+  const dansPeriode = (iso) => iso >= debut && iso <= fin;
+
+  const carte = (s) => {
+    const st = statutPdf(s);
+    const km = Number(s.distance_km) || 0, sec = dureeSec(s) || 0;
+    const chiffres = [km ? (Math.round(km * 10) / 10).toLocaleString("fr-FR") + " km" : null, sec ? enDuree(sec) : null].filter(Boolean).join(" · ");
+    const prevu = s.parametres && s.parametres.prevu;
+    return el("div", { class: "pdf-s " + st, style: "--c:" + (COULEURS_TYPES[s.type] || "#555") }, [
+      el("div", { class: "pdf-t" }, (MODELES[s.type] ? MODELES[s.type].nom : "Séance") + (s.sport && s.sport !== "course" && SPORTS[s.sport] ? " · " + SPORTS[s.sport] : "")),
+      el("div", { class: "pdf-n" }, s.titre || "Séance"),
+      chiffres ? el("div", { class: "pdf-x" }, chiffres) : null,
+      s.ressenti ? el("div", { class: "pdf-r" }, "Ressenti " + s.ressenti + "/10") : null,
+      st === "modifiee" ? el("div", { class: "pdf-m" }, "Modifiée" + (prevu && prevu.titre ? " · prévu : " + prevu.titre : "")) : null,
+      st === "manquee" ? el("div", { class: "pdf-m gris" }, "Non faite") : null,
+      s.toute_semaine && !s.fait ? el("div", { class: "pdf-m gris" }, "Dans la semaine") : null,
+    ]);
+  };
+  const cal = el("div", { class: "pdf-cal" }, ["Lun.", "Mar.", "Mer.", "Jeu.", "Ven.", "Sam.", "Dim."].map((j) => el("div", { class: "pdf-h" }, j)));
+  semaines.forEach((sem) => sem.forEach((iso) => {
+    cal.append(el("div", { class: "pdf-case" + (dansPeriode(iso) ? "" : " hors") }, [
+      el("div", { class: "pdf-d" }, court(iso)),
+      ...seances.filter((s) => s.date === iso).map(carte),
+    ]));
+  }));
+  const typesVus = [...new Set(seances.map((s) => s.type).filter((t) => MODELES[t]))];
+  const legende = el("div", { class: "pdf-leg" }, typesVus.map((t) => el("span", {}, [el("i", { style: "background:" + (COULEURS_TYPES[t] || "#555") }), MODELES[t].nom])));
+
+  const totaux = semaines.map((sem) => {
+    const du = seances.filter((s) => sem.includes(s.date));
+    const faites = du.filter((s) => s.fait);
+    return { sem, km: faites.reduce((t, s) => t + kmCourse(s), 0), sec: faites.reduce((t, s) => t + (dureeSec(s) || 0), 0), nf: faites.length, np: du.length };
+  });
+  const maxKm = Math.max(1, ...totaux.map((t) => t.km)), maxSec = Math.max(1, ...totaux.map((t) => t.sec));
+  const barre = (v, max) => { const i = el("i"); i.style.width = Math.round((v / max) * 100) + "%"; return el("div", { class: "pdf-barre" }, i); };
+  const cote = el("div", { class: "pdf-cote" }, [el("div", { class: "pdf-mini" }, "Par semaine"), ...totaux.map((t) => el("div", { class: "pdf-bloc" }, [
+    el("b", {}, "Du " + dateLocale(t.sem[0]).getDate() + " au " + jm(t.sem[6])),
+    el("div", { class: "pdf-ln" }, [el("span", {}, "Temps"), el("strong", {}, t.sec ? enDuree(t.sec) : "0 min")]), barre(t.sec, maxSec),
+    el("div", { class: "pdf-ln" }, [el("span", {}, "Distance"), el("strong", {}, (Math.round(t.km * 10) / 10).toLocaleString("fr-FR") + " km")]), barre(t.km, maxKm),
+    el("div", { class: "pdf-ln" }, [el("span", {}, "Séances faites"), el("strong", {}, t.nf + "/" + t.np)]),
+  ]))]);
+
+  const rapport = el("div", { class: "pdf-page", style: "--acc:" + couleurDe(personne) }, [
+    el("header", { class: "pdf-tete" }, [
+      el("div", {}, [el("div", { class: "pdf-mini" }, "Programme et bilan"), el("h1", {}, nomComplet(personne)),
+        el("div", { class: "pdf-sous" }, "Du " + jm(debut) + " au " + jm(fin) + " " + dateLocale(fin).getFullYear())]),
+      el("div", { class: "pdf-droite" }, [el("div", { class: "pdf-logo" }, ["athlé", el("span", {}, ".")]),
+        el("div", { class: "pdf-genere" }, "Généré par " + nomComplet(moi) + " le " + jm(aujourdhui()))]),
+    ]),
+    el("div", { class: "pdf-corps" }, [el("div", {}, [cal, legende]), cote]),
+  ]);
+  const imprimer = el("button", { type: "button" }, "Enregistrer en PDF / Imprimer");
+  const fermer = el("button", { type: "button", class: "ghost" }, "Fermer");
+  const vue = el("div", { class: "pdf-vue", role: "dialog", "aria-label": "Aperçu du PDF" }, [
+    el("div", { class: "pdf-barre-outils" }, [imprimer, fermer, el("p", { class: "aide" }, "Sur iPhone : « Enregistrer en PDF » ouvre la fenêtre d'impression ; choisis « Partager » ou « Enregistrer dans Fichiers ».")]),
+    rapport,
+  ]);
+  imprimer.addEventListener("click", () => window.print());
+  fermer.addEventListener("click", () => { vue.remove(); document.body.classList.remove("avec-pdf"); });
+  document.body.append(vue);
+  document.body.classList.add("avec-pdf");
+  // Sur téléphone, l'aperçu est la page A4 entière, réduite pour tenir dans l'écran
+  const ajuster = () => { rapport.style.zoom = ""; rapport.style.zoom = String(Math.min(1, (vue.clientWidth - 24) / rapport.offsetWidth)); };
+  ajuster();
+  window.addEventListener("resize", ajuster);
+  fermer.addEventListener("click", () => window.removeEventListener("resize", ajuster));
+  document.title = "Athlé - " + nomComplet(personne) + " - " + debut + " au " + fin;
+}
+$("bouton-pdf").addEventListener("click", async () => {
+  $("erreur-pdf").hidden = true;
+  try { await pendant($("bouton-pdf"), "Préparation…", genererPdf); }
+  catch (e) { $("erreur-pdf").textContent = messageErreur(e); $("erreur-pdf").hidden = false; }
+});
 </script>
 </body>
 </html>
