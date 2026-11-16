@@ -911,7 +911,9 @@ html[data-coins="ronds"] .photo-seance { border-radius: 10px; }
 /* ---------- PDF du coach ---------- */
 .dates-pdf { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .pdf-vue { position: fixed; inset: 0; z-index: 80; background: #e9e7e2; overflow: auto; padding: 12px; color: #111; animation: fondu .2s both; }
-.pdf-barre-outils { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 297mm; margin: 0 auto 12px; }
+.pdf-barre-outils { position: sticky; top: -12px; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; max-width: 297mm; margin: -12px auto 12px; padding: 12px 0 10px; background: #e9e7e2; }
+.pdf-barre-outils button { background: var(--track); color: var(--track-ink, #fff); border: 0; }
+.pdf-barre-outils button.pdf-fermer { background: #111; color: #fff; order: -1; }
 .pdf-barre-outils .aide { flex-basis: 100%; margin: 0; color: #555; }
 .pdf-page { background: #fff; color: #111; width: 277mm; margin: 0 auto; padding: 8mm 10mm; box-sizing: content-box; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-size: 9pt; box-shadow: 0 6px 30px rgba(0,0,0,.12); }
 .pdf-tete { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid #111; padding-bottom: 6px; margin-bottom: 10px; }
@@ -5549,7 +5551,7 @@ async function genererPdf() {
     el("div", { class: "pdf-corps" }, [cal, legende]),
   ]);
   const imprimer = el("button", { type: "button" }, "Enregistrer en PDF / Imprimer");
-  const fermer = el("button", { type: "button", class: "ghost" }, "Fermer");
+  const fermer = el("button", { type: "button", class: "pdf-fermer" }, "✕ Fermer");
   const vue = el("div", { class: "pdf-vue", role: "dialog", "aria-label": "Aperçu du PDF" }, [
     el("div", { class: "pdf-barre-outils" }, [imprimer, fermer, el("p", { class: "aide" }, "Sur iPhone : « Enregistrer en PDF » ouvre la fenêtre d'impression ; choisis « Partager » ou « Enregistrer dans Fichiers ».")]),
     rapport,
