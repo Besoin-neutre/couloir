@@ -757,8 +757,13 @@ button.lien { color: var(--ink); font-weight: 400; border-radius: 0; }
 
 /* Footing avec marche : les blocs (course + récup sur une ligne) */
 .blocs { grid-column: 1 / -1; display: grid; gap: 6px; }
-.bloc { display: grid; grid-template-columns: 1.4em minmax(0, 1fr) minmax(0, 1fr) auto; gap: 6px; align-items: center; }
-.bloc > .bloc-consigne { grid-column: 2 / -1; }
+.bloc.lot .lot-etiquette { min-width: 54px; }
+.bloc.lot .lot-ligne { gap: 5px; flex-wrap: nowrap; }
+.bloc.lot .lot-ligne input { width: 48px; }
+.bloc.lot .bouton-icone { width: 32px; height: 32px; }
+.bloc.lot .bloc-num { min-width: 1.2em; }
+.duree-unite { display: flex; gap: 4px; }
+.bloc > .bloc-consigne { width: 100%; }
 .bloc input { text-align: center; padding: 9px 4px; font-weight: 600; }
 .bloc input.bloc-consigne { text-align: left; font-weight: 400; padding: 9px 12px; }
 .bloc input.invalide { border-color: var(--erreur); }
@@ -1852,7 +1857,7 @@ const MODELES = {
     champs: [],
     nbReps: (v) => lotsDe(v, "fractionne").reduce((t, l) => t + l.n, 0),
     titre: (v) => titreLots("Fractionné", lotsDe(v, "fractionne")),
-    corps: (v) => corpsLots(lotsDe(v, "fractionne"), recupSeriesDe(v), ""),
+    corps: (v) => corpsLots(lotsDe(v, "fractionne"), recupSeriesDe(v), "", ""),
   },
   seuil: {
     nom: "Seuil",
@@ -1876,14 +1881,22 @@ const MODELES = {
   cotes: {
     nom: "Côtes",
     echauffement: ECHAUFFEMENT,
-    nbReps: (v) => v.reps,
-    champs: [
-      { id: "reps", label: "Nombre de côtes", defaut: 8 },
-      { id: "duree", label: "Durée de chaque côte", temps: true, defaut: 30 },
-      { id: "recup", label: "Récup entre les côtes", temps: true, defaut: 90 },
-    ],
-    titre: (v) => "Côtes " + v.reps + " × " + enDuree(v.duree),
-    corps: (v) => v.reps + " × " + enDuree(v.duree) + " en côte, récup " + enDuree(v.recup) + " en redescendant en trottinant",
+    lots: { allures: ["", "MAX", "VMA", "AS5K", "AS10K", "AS21K", "AS42K", "SV1", "SV2", "autre"], suffixe: " en côte",
+      defaut: [{ n: 8, e: 30, u: "s", a: "", r: 90, ru: "s", rm: "course" }] },
+    champs: [],
+    nbReps: (v) => lotsDe(v, "cotes").reduce((t, l) => t + l.n, 0),
+    titre: (v) => titreLots("Côtes", lotsDe(v, "cotes")),
+    corps: (v) => corpsLots(lotsDe(v, "cotes"), recupSeriesDe(v), "", " en côte"),
+  },
+  sprint: {
+    nom: "Sprint",
+    echauffement: ECHAUFFEMENT_VITESSE,
+    lots: { allures: ["MAX", "", "VMA", "AS5K", "AS10K", "AS21K", "AS42K", "SV1", "SV2", "autre"],
+      defaut: [{ n: 6, e: 80, u: "m", a: "MAX", r: 180, ru: "min", rm: "marche" }] },
+    champs: [],
+    nbReps: (v) => lotsDe(v, "sprint").reduce((t, l) => t + l.n, 0),
+    titre: (v) => titreLots("Sprint", lotsDe(v, "sprint")),
+    corps: (v) => corpsLots(lotsDe(v, "sprint"), recupSeriesDe(v), "", ""),
   },
   vitesse: {
     nom: "Vitesse",
@@ -1913,13 +1926,14 @@ function blocSeries(v, effort) {
 // ---- Séances par séries (fractionné, seuil, séance mixte) ----
 // Une série : { n: répétitions, e: effort (secondes si u = "min", mètres si u = "m" ou "km"), u, a: allure cible, at: allure libre,
 //               r: récup entre répétitions (secondes si ru = "min", mètres si ru = "m"), ru }
-const NOMS_ALLURES = { "": "—", VMA: "VMA", AS5K: "AS5k", AS10K: "AS10k", AS21K: "AS21k", AS42K: "AS42k", SV1: "SV1", SV2: "SV2", autre: "Autre…" };
+const NOMS_ALLURES = { "": "—", MAX: "Vitesse max", VMA: "VMA", AS5K: "AS5k", AS10K: "AS10k", AS21K: "AS21k", AS42K: "AS42k", SV1: "SV1", SV2: "SV2", autre: "Autre…" };
 function lotsDe(v, type) {
   if (v && Array.isArray(v.lots) && v.lots.length) return v.lots;
   // Anciennes séances : « 2 × (5 × 400 m) » ou « 3 × 8 min »
   if (v && v.reps && (v.distance || v.duree)) {
-    const l = v.distance ? { n: v.reps, e: v.distance, u: "m" } : { n: v.reps, e: v.duree, u: "min" };
-    return Array.from({ length: v.series || 1 }, () => ({ ...l, a: "", r: v.recup || 0, ru: "min" }));
+    const l = v.distance ? { n: v.reps, e: v.distance, u: "m" } : { n: v.reps, e: v.duree, u: v.duree < 120 ? "s" : "min" };
+    const r = v.recup || 0;
+    return Array.from({ length: v.series || 1 }, () => ({ ...l, a: "", r, ru: r && r < 120 ? "s" : "min", rm: "course" }));
   }
   return (MODELES[type] && MODELES[type].lots ? MODELES[type].lots.defaut : []).map((l) => ({ ...l }));
 }
@@ -1928,9 +1942,10 @@ function recupSeriesDe(v) {
   return v && v.recupSerie ? { e: v.recupSerie, u: "min" } : { e: 180, u: "min" };
 }
 function texteRecup(e, u, mode) { return texteMesure(e, u) + (mode === "marche" ? " en marchant" : " en trottinant"); }
+const estTemps = (u) => u === "min" || u === "s";
 function texteMesure(e, u) {
   if (!e) return "";
-  if (u === "min") return enDuree(e);
+  if (estTemps(u)) return enDuree(e);
   if (u === "km") return (Math.round(e / 10) / 100).toLocaleString("fr-FR") + " km";
   return e + " m";
 }
@@ -1950,10 +1965,10 @@ function titreLots(nom, lots) {
     return k > 1 ? k + " × (" + t + ")" : t;
   }).join(" + ");
 }
-function corpsLots(lots, R, cibleParDefaut) {
+function corpsLots(lots, R, cibleParDefaut, suffixe = "") {
   const lignes = groupesLots(lots).map(({ k, l }) => {
     const cible = cibleDe(l) || cibleParDefaut;
-    const t = l.n + " × " + texteMesure(l.e, l.u) + (cible ? " à " + cible : "") + (l.r ? ", r = " + texteRecup(l.r, l.ru, l.rm) : "");
+    const t = l.n + " × " + texteMesure(l.e, l.u) + suffixe + (cible ? (l.a === "MAX" ? " à " + cible.toLowerCase() : " à " + cible) : "") + (l.r ? ", r = " + texteRecup(l.r, l.ru, l.rm) : "");
     return k > 1 ? k + " × (" + t + ")" : t;
   });
   if (lots.length > 1 && R && R.e) lignes.push("R = " + texteRecup(R.e, R.u, R.m) + " entre les séries");
@@ -2024,7 +2039,7 @@ function prevuRep(v, type) {
   // Séances par séries : une ligne par répétition, avec son temps ou sa distance et son allure cible
   if ((MODELES[type] && MODELES[type].lots) || (v && Array.isArray(v.lots))) {
     return { distance: null, duree: null, lignes: lotsDe(v, type).flatMap((l) => Array.from({ length: l.n }, () => ({
-      recup: false, duree: l.u === "min" ? l.e : null, distance: l.u !== "min" ? l.e : null, cible: cibleDe(l),
+      recup: false, duree: estTemps(l.u) ? l.e : null, distance: estTemps(l.u) ? null : l.e, cible: cibleDe(l),
     }))) };
   }
   return { distance: Number(v && v.distance) || null, duree: Number(v && v.duree) || null };
@@ -2118,11 +2133,23 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     };
     const lignes = series.map((b, i) => {
       const nom = "Bloc " + (i + 1);
+      // Une durée = un nombre + son unité (min ou s) dans une liste
       const caseDuree = (cle, label) => {
+        const cleU = cle + "u";
+        const unite = series[i][cleU] || (b[cle] && b[cle] < 60 ? "s" : "min");
+        series[i][cleU] = unite;
         const inp = el("input", { type: "text", inputmode: "decimal", id: prefixe + "-bloc-" + cle + "-" + i, "aria-label": nom + " : " + label, placeholder: "0", autocomplete: "off" });
-        inp.value = texteDureeBloc(b[cle]);
-        inp.addEventListener("input", () => { const v = lireDureeBloc(inp.value); inp.classList.toggle("invalide", Number.isNaN(v)); series[i][cle] = Number.isNaN(v) ? 0 : v; maj(); });
-        return inp;
+        const sel = el("select", { id: prefixe + "-bloc-" + cleU + "-" + i, "aria-label": nom + " : " + label + ", unité" }, [el("option", { value: "min" }, "min"), el("option", { value: "s" }, "s")]);
+        sel.value = unite;
+        inp.value = !b[cle] ? "" : unite === "s" ? String(b[cle]) : texteDureeBloc(b[cle]);
+        const lire = () => {
+          const t = inp.value.trim().replace(",", ".");
+          const v = !t ? 0 : sel.value === "s" ? (/^\d+(\.\d+)?$/.test(t) ? Math.round(Number(t)) : NaN) : lireDureeBloc(t);
+          inp.classList.toggle("invalide", Number.isNaN(v));
+          series[i][cle] = Number.isNaN(v) ? 0 : v; series[i][cleU] = sel.value; maj();
+        };
+        inp.addEventListener("input", lire); sel.addEventListener("change", lire);
+        return el("div", { class: "duree-unite" }, [inp, sel]);
       };
       const consigne = el("input", { id: prefixe + "-bloc-note-" + i, class: "bloc-consigne", placeholder: "Consigne (allure, sensations…)", "aria-label": nom + " : consigne", autocomplete: "off" });
       consigne.value = b.consigne || "";
@@ -2133,15 +2160,18 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
         iconeBouton(ICONE_COPIER, "Dupliquer le " + nom.toLowerCase(), () => { series.splice(i + 1, 0, { ...series[i] }); construireBlocs(); maj(); }),
         iconeBouton("<span aria-hidden=\"true\">×</span>", "Retirer le " + nom.toLowerCase(), () => { if (series.length > 1) { series.splice(i, 1); construireBlocs(); maj(); } }),
       ]);
-      return el("div", { class: "bloc" }, [el("span", { class: "bloc-num" }, String(i + 1)), caseDuree("c", "course"), caseDuree("r", "récup en marchant"), outils, consigne]);
+      return el("div", { class: "bloc lot" }, [
+        el("div", { class: "lot-ligne" }, [el("span", { class: "bloc-num" }, String(i + 1)), el("span", { class: "lot-etiquette" }, "Course"), caseDuree("c", "course"), outils]),
+        el("div", { class: "lot-ligne" }, [el("span", { class: "bloc-num" }, ""), el("span", { class: "lot-etiquette" }, "Marche"), caseDuree("r", "récup en marchant")]),
+        consigne,
+      ]);
     });
     const ajouter = el("button", { type: "button", class: "ghost compact" }, "+ Un bloc");
-    ajouter.addEventListener("click", () => { const dernier = series[series.length - 1] || { c: 600, r: 120 }; series.push({ c: dernier.c, r: dernier.r }); construireBlocs(); maj(); });
+    ajouter.addEventListener("click", () => { const dernier = series[series.length - 1] || { c: 600, r: 120 }; series.push({ c: dernier.c, r: dernier.r, cu: dernier.cu, ru: dernier.ru }); construireBlocs(); maj(); });
     zoneBlocs.replaceChildren(
-      el("div", { class: "bloc bloc-entete", "aria-hidden": "true" }, [el("span", {}, ""), el("span", { class: "label" }, "Course"), el("span", { class: "label" }, "Récup (marche)"), el("span", {}, "")]),
       ...lignes,
       el("div", { class: "actions" }, [ajouter]),
-      el("p", { class: "aide" }, "En minutes : « 10 », « 1:30 », ou « 45s » pour des secondes. Laisse la récup vide s'il n'y en a pas."),
+      el("p", { class: "aide" }, "Choisis min ou s dans chaque liste (en minutes, « 1:30 » marche aussi). Laisse la récup vide s'il n'y en a pas."),
     );
   }
 
@@ -2154,11 +2184,12 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     const t = String(texte || "").trim().replace(",", ".");
     if (!t) return 0;
     if (u === "min") return lireDureeBloc(t);
+    if (u === "s") { const n = Number(t.replace(/\s*s$/i, "")); return Number.isFinite(n) && n >= 0 ? Math.round(n) : NaN; }
     const n = Number(t.replace(/\s*(km|m)$/i, ""));
     if (!Number.isFinite(n) || n < 0) return NaN;
     return Math.round(u === "km" ? n * 1000 : n);
   }
-  const ecrireMesure = (e, u) => (!e ? "" : u === "min" ? texteDureeBloc(e) : u === "km" ? String(Math.round(e / 10) / 100).replace(".", ",") : String(e));
+  const ecrireMesure = (e, u) => (!e ? "" : u === "min" ? texteDureeBloc(e) : u === "s" ? String(e) : u === "km" ? String(Math.round(e / 10) / 100).replace(".", ",") : String(e));
   function construireLots() {
     const lots = lotsCourants();
     lotsParType[type] = lots;
@@ -2177,7 +2208,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
       const nb = el("input", { type: "text", inputmode: "numeric", id: prefixe + "-lot-n-" + i, "aria-label": nom + " : nombre de répétitions", class: "lot-nb", autocomplete: "off" });
       nb.value = String(l.n || "");
       nb.addEventListener("input", () => { const n = parseInt(nb.value, 10); lots[i].n = n > 0 && n <= 50 ? n : 0; maj(); });
-      const [effort, uniteEffort] = champMesure(i, "e", "u", [["min", "min"], ["m", "m"], ["km", "km"]], nom + " : temps ou distance de chaque répétition");
+      const [effort, uniteEffort] = champMesure(i, "e", "u", [["min", "min"], ["s", "s"], ["m", "m"], ["km", "km"]], nom + " : temps ou distance de chaque répétition");
       const allure = el("select", { id: prefixe + "-lot-a-" + i, "aria-label": nom + " : allure cible" }, conf.allures.map((a) => el("option", { value: a }, NOMS_ALLURES[a])));
       allure.value = conf.allures.includes(l.a) ? l.a : conf.allures[0];
       lots[i].a = allure.value;
@@ -2186,7 +2217,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
       autre.hidden = allure.value !== "autre";
       allure.addEventListener("change", () => { lots[i].a = allure.value; autre.hidden = allure.value !== "autre"; if (!autre.hidden) autre.focus(); maj(); });
       autre.addEventListener("input", () => { lots[i].at = autre.value; maj(); });
-      const [recup, uniteRecup] = champMesure(i, "r", "ru", [["min", "min"], ["m", "m"]], nom + " : récup entre les répétitions");
+      const [recup, uniteRecup] = champMesure(i, "r", "ru", [["min", "min"], ["s", "s"], ["m", "m"]], nom + " : récup entre les répétitions");
       const modeRecup = el("select", { id: prefixe + "-lot-rm-" + i, "aria-label": nom + " : récup en courant ou en marchant" }, [el("option", { value: "course" }, "Course"), el("option", { value: "marche" }, "Marche")]);
       modeRecup.value = l.rm === "marche" ? "marche" : "course";
       lots[i].rm = modeRecup.value;
@@ -2208,7 +2239,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
     const R = recupSeriesCourante();
     recupSeriesParType[type] = R;
     const rIn = el("input", { type: "text", inputmode: "decimal", id: prefixe + "-lot-R", autocomplete: "off", placeholder: "0" });
-    const rU = el("select", { id: prefixe + "-lot-RU", "aria-label": "Récup entre les séries : unité" }, [el("option", { value: "min" }, "min"), el("option", { value: "m" }, "m")]);
+    const rU = el("select", { id: prefixe + "-lot-RU", "aria-label": "Récup entre les séries : unité" }, [el("option", { value: "min" }, "min"), el("option", { value: "s" }, "s"), el("option", { value: "m" }, "m")]);
     const rM = el("select", { id: prefixe + "-lot-RM", "aria-label": "Récup entre les séries : en courant ou en marchant" }, [el("option", { value: "course" }, "Course"), el("option", { value: "marche" }, "Marche")]);
     rIn.value = ecrireMesure(R.e, R.u); rU.value = R.u; rM.value = R.m === "marche" ? "marche" : "course"; R.m = rM.value;
     const lireR = () => { const v = lireMesure(rIn.value, rU.value); R.e = Number.isNaN(v) ? 0 : v; R.u = rU.value; R.m = rM.value; maj(); };
@@ -2218,7 +2249,7 @@ function editeurModele(prefixe, { typeInitial = "footing", echauffementCoche = f
       ...lignes,
       el("div", { class: "actions" }, [ajouter]),
       lots.length > 1 ? el("div", { class: "lot-ligne lot-R" }, [el("label", { class: "lot-etiquette", for: rIn.id }, "Récup entre les séries"), rIn, rU, rM]) : null,
-      el("p", { class: "aide" }, "Temps : « 8 » = 8 min, « 1:30 », « 45s ». Distance en mètres (« 400 ») ou en km (« 1,5 »). La récup peut être un temps ou une distance (trot)."),
+      el("p", { class: "aide" }, "Choisis l'unité dans chaque liste : min, s, m ou km. En minutes, « 1:30 » marche aussi. La récup peut être un temps ou une distance."),
     );
   }
 
@@ -3040,6 +3071,11 @@ $("changer-profil").addEventListener("click", () => afficherChoix());
    Pour une nouvelle version : l'ajouter EN HAUT de la liste.
    ========================================================= */
 const VERSIONS = [
+  { num: "4.2", nom: "Pleine vitesse", date: "23 novembre 2026", nouveautes: [
+    "Nouveau type de séance : le sprint.",
+    "Côtes et sprint se construisent série par série, comme le fractionné : en temps, en distance, ou avec une allure cible (vitesse max, VMA, AS10k…).",
+    "Les temps se donnent au choix en minutes ou en secondes, avec une liste déroulante.",
+  ] },
   { num: "4.1", nom: "Sur papier", date: "16 novembre 2026", nouveautes: [
     "Le coach peut exporter en PDF le calendrier d'un athlète sur une période, depuis son profil : chaque séance avec son ressenti, et le temps et les km de chaque semaine.",
     "Pour chaque récup, on précise si elle se fait en courant ou en marchant.",
